@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>dopamina barata + UI ruim</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #050505;
+    font-family: "Comic Sans MS", "Segoe UI", sans-serif;
+    color: #eee;
+    cursor: default;
+    transition: background .2s;
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+  body.estourando { background: #ffffff; }
+
+  #mundo { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
+
+  /* ===== camadas de brilho ===== */
+  #escuridao { position: fixed; inset: 0; background: #000; pointer-events: none; z-index: 900; }
+  #estouro   { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 901; }
+
+  /* ===== HUD ===== */
+  #hud {
+    position: fixed; top: 8px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 14px;
+    z-index: 800; flex-wrap: wrap; padding: 0 10px;
+  }
+  .painel {
+    background: rgba(20,20,25,.8); border: 2px solid #333;
+    border-radius: 12px; padding: 6px 14px; text-align: center; backdrop-filter: blur(2px);
+  }
+  .painel .label { font-size: 10px; color: #888; letter-spacing: 1px; }
+  .painel .valor { font-size: 22px; font-weight: bold; }
+  #pPontos .valor { color: #ffd93d; text-shadow: 0 0 12px #ffd93d88; }
+  #pBrilho .valor { color: #6ec6ff; }
+  #pNivel .valor  { color: #ff7ce5; }
+
+  .barra { width: 180px; height: 10px; background: #222; border-radius: 8px; margin-top: 5px; overflow: hidden; position: relative; }
+  .barra > i { display: block; height: 100%; background: linear-gradient(90deg,#1a1a1a,#333,#6ec6ff,#fff,#ff5252); width: 5%; transition: width .15s; }
+  .zona { position: absolute; top: 0; bottom: 0; left: 45%; width: 30%; background: rgba(110,255,140,.25); border-left: 1px dashed #6f6; border-right: 1px dashed #6f6; }
+  #statusBrilho { font-size: 11px; margin-top: 3px; height: 13px; }
+  .barra-xp { width: 130px; margin-left: auto; margin-right: auto; }
+  .barra-xp > i { background: linear-gradient(90deg,#ff7ce5,#d500f9); }
+  #xpTxt { font-size: 10px; color: #999; margin-top: 3px; }
+
+  /* ===== botão FUJÃO de brilho (sempre visível) ===== */
+  #btnBrilho {
+    position: fixed; z-index: 990;
+    padding: 10px 14px; font-family: inherit; font-size: 13px; font-weight: bold;
+    background: #14202b; color: #6ec6ff; border: 2px solid #2a6d99; border-radius: 10px;
+    cursor: pointer; transition: transform .12s ease-out; white-space: nowrap;
+    box-shadow: 0 0 0 2px #000, 0 0 16px #6ec6ff, 0 0 3px #fff;
+  }
+  #btnBrilho:active { transform: scale(.9); }
+
+  /* ===== ZONA DOPAMINA (tudo aqui some com brilho ruim) ===== */
+  #zonaDopamina {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 14px; padding: 96px 12px 30px; overflow-y: auto;
+    opacity: 0; transition: opacity .4s; pointer-events: none;
+  }
+  #zonaDopamina.on { opacity: 1; pointer-events: auto; }
+  #zonaDopamina::-webkit-scrollbar { width: 8px; }
+  #zonaDopamina::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+  #btnDopa {
+    font-family: inherit; font-size: 26px; font-weight: bold;
+    padding: 26px 54px; border: none; border-radius: 26px;
+    background: radial-gradient(circle at 30% 30%, #ff8bd0, #d1006e);
+    color: #fff; cursor: pointer;
+    box-shadow: 0 9px 0 #7a003f, 0 12px 26px #d1006e88;
+    text-shadow: 0 2px 4px #0006; transition: transform .06s;
+  }
+  #btnDopa:active { transform: translateY(6px) scale(.97); box-shadow: 0 3px 0 #7a003f; }
+
+  #btnComprar {
+    font-family: inherit; font-size: 14px; font-weight: bold;
+    padding: 10px 18px; border: 2px solid #ffd93d; border-radius: 12px;
+    background: #2a2410; color: #ffd93d; cursor: pointer;
+  }
+  #btnComprar:disabled { opacity: .4; cursor: not-allowed; }
+  #dica { max-width: 360px; font-size: 12px; color: #bbb; line-height: 1.4; text-align: center; }
+
+  /* ===== máquinas ===== */
+  .maquinas {
+    display: grid; grid-template-columns: repeat(2, auto);
+    gap: 12px; justify-content: center; justify-items: center; align-items: start;
+  }
+  @media (max-width: 520px) { .maquinas { grid-template-columns: 1fr; } }
+  .maq {
+    width: 176px; background: rgba(18,18,24,.9); border: 2px solid #2c2c3a;
+    border-radius: 14px; padding: 12px; text-align: center;
+  }
+  .maq h3 { font-size: 14px; margin-bottom: 8px; }
+  .btn {
+    font-family: inherit; font-weight: bold; font-size: 13px; letter-spacing: .5px;
+    padding: 10px 12px; border-radius: 12px; cursor: pointer; border: none;
+    width: 100%; margin-top: 8px; color: #fff; text-transform: uppercase;
+    box-shadow: 0 4px 0 rgba(0,0,0,.45), 0 6px 14px rgba(0,0,0,.4);
+    transition: transform .08s, box-shadow .08s, filter .15s;
+  }
+  .btn:hover:not(:disabled) { filter: brightness(1.12); }
+  .btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 1px 0 rgba(0,0,0,.45); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
+  .btn-verde { background: linear-gradient(#33c559,#127a2b); }
+  .btn-roxo  { background: linear-gradient(#a54dff,#5e17b0); }
+  .btn-azul  { background: linear-gradient(#2ec8ff,#0077c2); }
+  #btnRoleta {
+    font-size: 16px; padding: 14px 22px; border-radius: 16px; letter-spacing: 1px;
+    background: linear-gradient(#00e5ff,#8a4dff);
+    box-shadow: 0 5px 0 #3a1d7a, 0 10px 24px #7c4dff77, 0 0 20px #00e5ff55;
+    text-shadow: 0 1px 3px #0009;
+  }
+  #btnRoleta:active:not(:disabled) { transform: translateY(5px); box-shadow: 0 1px 0 #3a1d7a; }
+
+  /* ===== slot bonito ===== */
+  .maq-slot { width: 234px; }
+  .maq-loot { width: 210px; }
+  .luzes { display: flex; justify-content: space-between; padding: 0 8px 5px; }
+  .luzes span { width: 8px; height: 8px; border-radius: 50%; background: #ffd93d; box-shadow: 0 0 6px #ffd93d; animation: pisca 1s infinite; }
+  .luzes span:nth-child(even) { animation-delay: .5s; background: #ff5252; box-shadow: 0 0 6px #ff5252; }
+  @keyframes pisca { 50% { opacity: .2; box-shadow: none; } }
+
+  .slotMoldura {
+    position: relative; display: flex; justify-content: center; gap: 6px; padding: 8px;
+    background: linear-gradient(#1a1206,#0a0a0a);
+    border: 3px solid #d4a017; border-radius: 12px;
+    box-shadow: inset 0 0 22px #000, 0 0 0 2px #7a5c00, 0 4px 14px #000a;
+  }
+  .reel {
+    width: 58px; height: 64px; overflow: hidden; border-radius: 8px;
+    background: linear-gradient(#f4f4f4,#d0d0d0);
+    box-shadow: inset 0 8px 10px #0007, inset 0 -8px 10px #0007;
+  }
+  .strip { display: flex; flex-direction: column; will-change: transform; }
+  .sym { height: 64px; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .payline {
+    position: absolute; left: 8px; right: 8px; top: 50%; height: 3px; transform: translateY(-1px);
+    background: #ff3b3b; box-shadow: 0 0 8px #ff3b3b; border-radius: 2px; pointer-events: none;
+  }
+
+  .paytable { margin-top: 10px; width: 100%; border-collapse: collapse; font-size: 11px; }
+  .paytable td { padding: 3px 4px; border-bottom: 1px solid #2a2a2a; color: #ccc; }
+  .paytable td:last-child { text-align: right; color: #ffd93d; font-weight: bold; }
+  .ptNota { font-size: 10px; color: #7CFC7C; margin-top: 5px; }
+
+  /* loot box */
+  .caixa { font-size: 46px; transition: transform .1s; }
+  .caixa.mexe { animation: chacoalha .12s infinite; }
+  @keyframes chacoalha { 25%{transform:rotate(-12deg)} 75%{transform:rotate(12deg)} }
+
+  /* ===== abas ===== */
+  .abas { display: flex; gap: 6px; }
+  .abaBtn {
+    font-family: inherit; font-weight: bold; font-size: 13px;
+    padding: 8px 16px; border-radius: 10px 10px 0 0;
+    border: 2px solid #2c2c3a; border-bottom: none;
+    background: #15151d; color: #888; cursor: pointer;
+  }
+  .abaBtn.ativa { background: #22222e; color: #fff; }
+  .pane { width: 100%; max-width: 780px; display: flex; flex-direction: column; align-items: center; }
+  .pane[hidden] { display: none; }
+
+  /* roleta GRANDE */
+  .rodaWrap { position: relative; width: 300px; height: 300px; margin: 0 auto; }
+  .roda {
+    width: 300px; height: 300px; border-radius: 50%;
+    border: 6px solid #555; box-shadow: 0 0 0 4px #222, 0 8px 30px #000a;
+    transition: transform 3.2s cubic-bezier(.15,.7,.15,1);
+    background: conic-gradient(
+      #00e676 0deg 45deg, #ff1744 45deg 90deg, #00b0ff 90deg 135deg,
+      #d500f9 135deg 180deg, #ffea00 180deg 225deg, #ff3d00 225deg 270deg,
+      #7c4dff 270deg 315deg, #1de9b6 315deg 360deg );
+  }
+  .roda::after {   /* eixo central */
+    content: ""; position: absolute; top: 50%; left: 50%; width: 26px; height: 26px;
+    margin: -13px 0 0 -13px; border-radius: 50%; background: #eee; box-shadow: 0 0 0 4px #555;
+  }
+  .ponteiro {
+    position: absolute; top: -10px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent;
+    border-top: 26px solid #fff; z-index: 3; filter: drop-shadow(0 2px 3px #000);
+  }
+  .rlabel {
+    position: absolute; left: 50%; top: 50%; width: 92px;
+    text-align: center; font-size: 12px; font-weight: bold; color: #fff; line-height: 1.05;
+    text-shadow: 0 0 3px #000, 0 1px 2px #000, 0 0 6px #000; pointer-events: none;
+  }
+
+  /* botão arriscado */
+  #btnRisco { background: linear-gradient(#ff4fa3,#a3005f); color: #fff; }
+  #btnCortizol { background: linear-gradient(#4dd0a7,#127a5e); color: #fff; }
+  #cortizolInd {
+    position: fixed; top: 92px; left: 12px; z-index: 805; display: none;
+    background: rgba(19,122,94,.92); border: 1px solid #4dd0a7; color: #dfffef;
+    padding: 6px 12px; border-radius: 10px; font-size: 13px; font-weight: bold;
+    box-shadow: 0 0 14px #4dd0a788;
+  }
+  #barraRisco { height: 8px; background:#220; border-radius:4px; margin-top:8px; overflow:hidden; }
+  #barraRisco > i { display:block; height:100%; width:0%; background:linear-gradient(90deg,#7CFC7C,#ffd93d,#ff5252); transition:width .2s; }
+
+  /* ===== mão de cartas ===== */
+  .mao { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 780px; min-height: 10px; }
+  .maoTitulo { font-size: 12px; color: #999; width: 100%; text-align: center; }
+  .carta {
+    width: 134px; border-radius: 12px; padding: 8px; text-align: center;
+    border: 2px solid; font-size: 11px; position: relative; background: #122018;
+  }
+  .carta.comum { background: #122018; border-color: #2e8b57; }
+  .carta .ruim { color: #ff8a8a; }
+  .carta.raro { background: #0d0d16; animation: rgbBorda 3s linear infinite; }
+  .carta.raro .cNome { color: #ffe27a; text-shadow: 0 0 8px #ffcf4088; }
+  @keyframes rgbBorda {
+    0%  { border-color:#ff2d2d; box-shadow:0 0 12px #ff2d2daa; }
+    16% { border-color:#ff9d00; box-shadow:0 0 12px #ff9d00aa; }
+    33% { border-color:#ffe600; box-shadow:0 0 12px #ffe600aa; }
+    50% { border-color:#38ff5b; box-shadow:0 0 12px #38ff5baa; }
+    66% { border-color:#00e5ff; box-shadow:0 0 12px #00e5ffaa; }
+    83% { border-color:#4d7bff; box-shadow:0 0 12px #4d7bffaa; }
+    100%{ border-color:#c94dff; box-shadow:0 0 12px #c94dffaa; }
+  }
+  .carta .cEmoji { font-size: 30px; }
+  .carta .cNome { font-weight: bold; font-size: 12px; margin: 2px 0; }
+  .carta .cDesc { color: #cde; min-height: 30px; line-height: 1.25; }
+  .carta .vender { display: flex; gap: 4px; margin-top: 6px; }
+  .carta .vender button {
+    flex: 1; font-family: inherit; font-size: 11px; font-weight: bold;
+    border: none; border-radius: 6px; padding: 4px 0; cursor: pointer;
+  }
+  .vP { background: #4a3f00; color: #ffd93d; }
+  .vB { background: #10303f; color: #6ec6ff; }
+
+  /* ===== pets ===== */
+  #petTotal { font-size: 12px; color: #9ecb9e; margin: 10px 0 6px; text-align: center; }
+  .petsGrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; max-width: 660px; }
+  .pet {
+    width: 124px; background: #15151d; border: 2px solid #333; border-radius: 12px;
+    padding: 10px 8px; text-align: center; position: relative;
+  }
+  .pet.comum    { border-color: #4a7a4a; }
+  .pet.incomum  { border-color: #4a7ad0; }
+  .pet.raro     { border-color: #b06ad0; box-shadow: 0 0 10px #b06ad066; }
+  .pet.lendario { border-color: #ff4d6d; box-shadow: 0 0 14px #ff4d6d; animation: petLenda 1s infinite alternate; }
+  @keyframes petLenda { to { box-shadow: 0 0 28px #ff4d6d, 0 0 44px #ff4d6daa; } }
+  .pet.bloq { opacity: .45; filter: grayscale(1); }
+  .petEmoji { font-size: 46px; line-height: 1.1; }
+  .petEmoji img { width: 54px; height: 54px; object-fit: cover; border-radius: 10px; vertical-align: middle; box-shadow: 0 2px 6px #000a; }
+  .petNome { font-weight: bold; font-size: 12px; margin-top: 4px; }
+  .petRate { font-size: 10px; color: #9ecb9e; margin-top: 2px; min-height: 14px; }
+  .petQtd {
+    position: absolute; top: -8px; right: -8px; background: #ffd93d; color: #111;
+    font-weight: bold; font-size: 12px; padding: 2px 8px; border-radius: 10px; box-shadow: 0 0 8px #ffd93d88;
+  }
+  .pet .petVender { display: flex; gap: 4px; margin-top: 7px; }
+  .pet .petVender button {
+    flex: 1; font-family: inherit; font-size: 11px; font-weight: bold;
+    border: none; border-radius: 6px; padding: 4px 0; cursor: pointer;
+  }
+  .pet .petExtra { font-size: 10px; color: #888; margin-top: 3px; }
+  #petDica { font-size: 11px; color: #999; margin-bottom: 6px; text-align: center; }
+
+  /* ===== efeitos ===== */
+  .pop { position: fixed; z-index: 950; font-weight: bold; font-size: 24px; pointer-events: none; animation: subir .9s ease-out forwards; }
+  @keyframes subir { 0%{transform:translateY(0) scale(.6);opacity:1} 100%{transform:translateY(-90px) scale(1.4);opacity:0} }
+  .confete { position: fixed; z-index: 940; width: 10px; height: 14px; pointer-events: none; }
+
+  #streak { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    z-index: 800; font-size: 17px; font-weight: bold; color: #ff9f43; text-shadow: 0 0 10px #ff9f4388; opacity: 0; transition: opacity .3s; }
+
+  #noti {
+    position: fixed; z-index: 905; top: 50%; left: 50%;
+    transform: translate(-50%,-50%) scale(0);
+    width: min(560px, 88vw);
+    background: #1c1c22; border: 3px solid #ff4757; border-radius: 22px;
+    padding: 44px 48px; cursor: pointer; text-align: center;
+    opacity: 0; transition: transform .35s cubic-bezier(.2,1.5,.4,1), opacity .3s;
+  }
+  #noti.on { transform: translate(-50%,-50%) scale(1); opacity: 1; animation: brilhaNoti 1s infinite alternate; }
+  @keyframes brilhaNoti {
+    from { box-shadow: 0 0 30px #ff4757, 0 0 70px #ff475766; }
+    to   { box-shadow: 0 0 70px #ff4757, 0 0 140px #ff4757bb; }
+  }
+  #noti b { color: #ff6b81; font-size: 28px; line-height: 1.25; }
+  #noti small { display: block; font-size: 19px; color: #ddd; margin-top: 14px; }
+  #noti .x { position: absolute; top: 12px; right: 18px; color: #999; font-size: 30px; }
+  #noti .bolinha {
+    position: absolute; top: -18px; left: -18px; background: #ff4757; color: #fff;
+    font-size: 24px; font-weight: bold; width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 18px #ff4757;
+  }
+
+  #ganhou { position: fixed; inset: 0; z-index: 960; display: none; align-items: center; justify-content: center; flex-direction: column;
+    background: rgba(0,0,0,.4); font-size: 52px; font-weight: bold; color: #ffd93d; text-shadow: 0 0 30px #ffd93d; animation: pulso .5s infinite alternate; text-align:center; }
+  @keyframes pulso { to { transform: scale(1.1); } }
+
+  .mute { position: fixed; bottom: 12px; right: 12px; z-index: 810; background: #222; border: 1px solid #444; color: #aaa; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
+
+  /* ===== CELULAR ===== */
+  @media (max-width: 600px) {
+    #hud { gap: 6px; top: 6px; }
+    .painel { padding: 5px 9px; border-radius: 10px; }
+    .painel .valor { font-size: 17px; }
+    .painel .label { font-size: 9px; }
+    .barra { width: 120px; }
+    .barra-xp { width: 96px; }
+    #statusBrilho { font-size: 10px; height: 12px; }
+
+    #zonaDopamina { padding-top: 144px; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    #btnDopa { font-size: 22px; padding: 20px 38px; }
+    #btnComprar { font-size: 13px; }
+    #btnBrilho { font-size: 12px; padding: 9px 12px; }
+    #dica { font-size: 12px; }
+
+    .abas { flex-wrap: wrap; justify-content: center; }
+    .abaBtn { padding: 7px 10px; font-size: 12px; border-radius: 10px; }
+    .maq, .maq-slot, .maq-loot { width: 100%; max-width: 300px; }
+
+    #noti { width: min(330px, 84vw); padding: 24px 20px; }
+    #noti b { font-size: 20px; }
+    #noti small { font-size: 15px; }
+    #noti .bolinha { width: 38px; height: 38px; font-size: 19px; top: -14px; left: -14px; }
+    #noti .x { font-size: 26px; top: 8px; right: 12px; }
+
+    #cortizolInd { top: auto; bottom: 54px; left: 8px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div id="mundo">
+
+  <div id="hud">
+    <div class="painel" id="pPontos"><div class="label">PONTOS</div><div class="valor" id="vPontos">0</div></div>
+    <div class="painel" id="pBrilho">
+      <div class="label">BRILHO</div><div class="valor" id="vBrilho">5%</div>
+      <div class="barra"><div class="zona"></div><i id="barBrilho"></i></div>
+      <div id="statusBrilho"></div>
+    </div>
+    <div class="painel" id="pNivel">
+      <div class="label">NÍVEL</div><div class="valor" id="vNivel">1</div>
+      <div class="barra barra-xp"><i id="barXP"></i></div>
+      <div id="xpTxt">0 / 20 XP</div>
+    </div>
+  </div>
+
+  <button id="btnBrilho">☀️ AUMENTAR BRILHO</button>
+
+  <div id="zonaDopamina">
+    <button id="btnDopa">🍬 CLICAR 🍬</button>
+    <button id="btnComprar">💡 comprar brilho (10 pts → +12%)</button>
+    <div id="dica"></div>
+
+    <!-- ABAS -->
+    <div class="abas">
+      <button class="abaBtn ativa" data-aba="maquinas">🎰 Máquinas</button>
+      <button class="abaBtn" data-aba="roleta">🎡 Roleta</button>
+      <button class="abaBtn" data-aba="cartas">🃏 Cartas</button>
+      <button class="abaBtn" data-aba="pets">🐾 Pets</button>
+    </div>
+
+    <!-- ABA: MÁQUINAS -->
+    <div class="pane" id="pane-maquinas">
+      <div class="maquinas">
+        <!-- SLOT -->
+        <div class="maq maq-slot">
+          <h3>🎰 Caça-níquel</h3>
+          <div class="luzes"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="slotMoldura">
+            <div class="reel" id="r0"><div class="strip"><div class="sym">🍒</div></div></div>
+            <div class="reel" id="r1"><div class="strip"><div class="sym">🔔</div></div></div>
+            <div class="reel" id="r2"><div class="strip"><div class="sym">💎</div></div></div>
+            <div class="payline"></div>
+          </div>
+          <button class="btn btn-verde" id="btnSlot">GIRAR (5 pts)</button>
+          <table class="paytable">
+            <tr><td>7️⃣ 7️⃣ 7️⃣</td><td>100</td></tr>
+            <tr><td>💎 💎 💎</td><td>50</td></tr>
+            <tr><td>🔔 🔔 🔔</td><td>30</td></tr>
+            <tr><td>🍒🍒🍒 / 🍋🍋🍋</td><td>15</td></tr>
+            <tr><td>2 iguais</td><td>5</td></tr>
+          </table>
+          <div class="ptNota">🍀 Trevo dobra os prêmios</div>
+        </div>
+
+        <!-- LOOT BOX -->
+        <div class="maq maq-loot">
+          <h3>🎁 Loot Box</h3>
+          <div class="caixa" id="caixa">🎁</div>
+          <button class="btn btn-roxo" id="btnLoot">ABRIR (15 pts)</button>
+          <table class="paytable">
+            <tr><td>🃏 carta comum</td><td>35%</td></tr>
+            <tr><td>💰 8–22 pontos</td><td>30%</td></tr>
+            <tr><td>💡 8–18% brilho</td><td>20%</td></tr>
+            <tr><td>✨ +50 pontos</td><td>11%</td></tr>
+            <tr><td>🌈 carta RARA</td><td>4%</td></tr>
+          </table>
+        </div>
+
+        <!-- BOTÃO ARRISCADO -->
+        <div class="maq">
+          <h3>🎲 Subir Nível</h3>
+          <div style="font-size:11px;color:#bbb;height:28px">clica e sobe de nível na hora… mas a chance de <b>resetar</b> só cresce</div>
+          <div id="barraRisco"><i></i></div>
+          <button class="btn" id="btnRisco">SUBIR (risco 0%)</button>
+        </div>
+
+        <!-- LOW CORTISOL -->
+        <div class="maq">
+          <h3>🧘 Low Cortisol</h3>
+          <div style="font-size:11px;color:#bbb;height:44px">a tela <b>para de escurecer sozinha</b> por 10 min. recarrega a cada 30 min.</div>
+          <button class="btn" id="btnCortizol">🧘 ATIVAR</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ABA: ROLETA -->
+    <div class="pane" id="pane-roleta" hidden>
+      <h3 style="margin-bottom:10px">🎡 Roleta da Sorte</h3>
+      <div class="rodaWrap"><div class="ponteiro"></div><div class="roda" id="roda"></div></div>
+      <button class="btn btn-azul" id="btnRoleta" style="max-width:260px;margin-top:16px">GIRAR (8 pts)</button>
+    </div>
+
+    <!-- ABA: CARTAS -->
+    <div class="pane" id="pane-cartas" hidden>
+      <div class="mao">
+        <div class="maoTitulo" id="maoTitulo">🃏 Sua mão (0/6) — cartas dão efeito enquanto na mão</div>
+        <div id="cartasBox" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+      </div>
+    </div>
+
+    <!-- ABA: PETS -->
+    <div class="pane" id="pane-pets" hidden>
+      <button class="btn btn-roxo" id="btnOvo" style="max-width:280px">🥚 abrir ovo (40 pts)</button>
+      <div id="petDica">cada pet rende só 1× — as cópias repetidas você vende 💰</div>
+      <div id="petTotal">renda passiva: +0 pts a cada 2s</div>
+      <div class="petsGrid" id="petsBox"></div>
+    </div>
+  </div>
+
+  <div id="streak"></div>
+
+  <div id="noti">
+    <span class="bolinha">1</span><span class="x">✕</span>
+    <b>🔔 Você tem 1 recompensa esperando!</b><small>toque para resgatar agora mesmo…</small>
+  </div>
+
+  <div id="ganhou"></div>
+
+  <div id="cortizolInd"></div>
+
+  <div id="escuridao"></div>
+  <div id="estouro"></div>
+</div>
+
+<button class="mute" id="btnMute">🔊 som</button>
+
+<script>
+// ================= ESTADO =================
+let pontos = 0, brilho = 5, nivel = 1;
+let streak = 0, streakTimer = null, comboMult = 1;
+let somLigado = true;
+let risco = 0, xp = 0;
+let pets = {};   // id -> quantidade
+let cartas = [];            // mão do jogador
+let rotTotal = 0;           // rotação acumulada da roleta
+let travado = { slot:false, roleta:false, loot:false };
+
+const CUSTO_BRILHO = 10, GANHO_BRILHO = 12;
+const CUSTO_OVO = 40;
+const ZONA_MIN = 45, ZONA_MAX = 75;
+const MAO_MAX = 6;
+
+// ================= CATÁLOGO DE CARTAS =================
+// mods: clique (+/- pts por clique) | escurec/decai/premio (multiplicadores, 1 = neutro)
+const CARTAS_COMUNS = [
+  { id:'ouro',     nome:'Dedo de Ouro', emoji:'🥇', desc:'+3 pts/clique<br><span class="ruim">escurece +60%</span>',      mods:{clique:3, escurec:1.6} },
+  { id:'vampiro',  nome:'Vampiro',      emoji:'🧛', desc:'escurece 50% menos<br><span class="ruim">-1 pt/clique</span>',   mods:{clique:-1, escurec:0.5} },
+  { id:'solar',    nome:'Painel Solar', emoji:'☀️', desc:'decai bem devagar<br><span class="ruim">prêmios pela metade</span>', mods:{decai:0.3, premio:0.5} },
+  { id:'apostador',nome:'Apostador',    emoji:'🎲', desc:'prêmios em DOBRO<br><span class="ruim">decai mais rápido</span>', mods:{premio:2, decai:1.8} },
+  { id:'guloso',   nome:'Guloso',       emoji:'🍔', desc:'+2 pts/clique<br><span class="ruim">decai mais rápido</span>',   mods:{clique:2, decai:1.5} },
+  { id:'equilib',  nome:'Equilibrista', emoji:'🌗', desc:'escurece 40% menos<br><span class="ruim">prêmios -25%</span>',   mods:{escurec:0.6, premio:0.75} },
+  { id:'bateria',  nome:'Bateria',      emoji:'🔋', desc:'decai devagar<br><span class="ruim">-1 pt/clique</span>',        mods:{decai:0.5, clique:-1} },
+  { id:'minerad',  nome:'Minerador',    emoji:'⛏️', desc:'prêmios +50%<br><span class="ruim">escurece +30%</span>',       mods:{premio:1.5, escurec:1.3} },
+  { id:'turbo',    nome:'Turbo',        emoji:'⚡', desc:'+4 pts/clique<br><span class="ruim">escurece +40% e decai rápido</span>', mods:{clique:4, escurec:1.4, decai:1.5} },
+];
+const CARTAS_RARAS = [   // 🌈 só buff, sem downside
+  { id:'trevo',  nome:'Trevo Dourado', emoji:'🍀', desc:'prêmios em DOBRO',            mods:{premio:2} },
+  { id:'midas',  nome:'Rei Midas',     emoji:'👑', desc:'+5 pts por clique',           mods:{clique:5} },
+  { id:'prisma', nome:'Prisma',        emoji:'🌈', desc:'escurece 70% menos<br>e decai bem devagar', mods:{escurec:0.3, decai:0.5} },
+  { id:'star',   nome:'Superstar',     emoji:'⭐', desc:'+3 pts/clique<br>e prêmios +50%', mods:{clique:3, premio:1.5} },
+  { id:'deus',   nome:'Modo Deus',     emoji:'🔱', desc:'+4 pts/clique, escurece 50% menos<br>e prêmios +50%', mods:{clique:4, escurec:0.5, premio:1.5} },
+];
+
+// ================= ELEMENTOS =================
+const $ = id => document.getElementById(id);
+const escuridao=$("escuridao"), estouro=$("estouro"), btnBrilho=$("btnBrilho");
+const zonaDopa=$("zonaDopamina"), btnDopa=$("btnDopa"), btnComprar=$("btnComprar"), dica=$("dica");
+
+// ================= SOM =================
+let ac;
+function bip(freq,dur=0.08,tipo="square",vol=0.15){
+  if(!somLigado) return;
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type=tipo; o.frequency.value=freq; g.gain.value=vol;
+    o.connect(g); g.connect(ac.destination); o.start();
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur);
+    o.stop(ac.currentTime+dur);
+  }catch(e){}
+}
+
+// ================= ÁUDIOS =================
+const SONS = {
+  fah:    new Audio("fahhhhhhhhhhhhhh.mp3"),     // jackpot / carta rara
+  yippee: new Audio("yippeeeeeeeeeeeeee.mp3"),   // subir de nível
+  boom:   new Audio("vine-boom.mp3"),            // coisa negativa
+};
+function tocar(nome, vol=0.7){
+  if(!somLigado) return;
+  const base = SONS[nome]; if(!base) return;
+  const a = base.cloneNode();      // clone permite tocar sobreposto / repetido
+  a.volume = vol;
+  a.play().catch(()=>{});
+}
+
+// ================= HELPERS DE CARTA =================
+function multMod(chave, base){ return cartas.reduce((a,c)=> a * (c.mods[chave] ?? 1), base); }
+function fatorEscurecimento(){ return multMod('escurec', 2.2); }
+function fatorDecaimento(){ return multMod('decai', 0.4); }
+function multPremio(){ return multMod('premio', 1); }
+function bonusPorClique(){ return cartas.reduce((a,c)=> a + (c.mods.clique||0), 0); }
+
+function darCarta(raridade){   // 'comum' ou 'rara'
+  if(cartas.length >= MAO_MAX){
+    popup(window.innerWidth/2, 260, "mão cheia! 🃏", "#ff5252");
+    addPontos(5); // consolação
+    return;
+  }
+  const rara = raridade === 'rara';
+  const pool = rara ? CARTAS_RARAS : CARTAS_COMUNS;
+  const base = pool[Math.random()*pool.length|0];
+  cartas.push({...base, raro: rara});
+  bip(rara?900:660, .12, "sine");
+  popup(window.innerWidth/2, 240, (rara?"CARTA RARA ":"+ carta ")+base.emoji, rara?"#1de9b6":"#7CFC7C");
+  if(rara){ chuvaConfete(window.innerWidth/2, 240); tocar('fah'); }
+  renderCartas();
+}
+
+function renderCartas(){
+  $("maoTitulo").textContent = `🃏 Sua mão (${cartas.length}/${MAO_MAX}) — cartas dão efeito enquanto na mão`;
+  const box = $("cartasBox");
+  box.innerHTML = "";
+  cartas.forEach((c,idx)=>{
+    const vP = c.raro?30:15, vB = c.raro?35:18;
+    const el = document.createElement("div");
+    el.className = "carta " + (c.raro?"raro":"comum");
+    el.innerHTML =
+      `<div class="cEmoji">${c.emoji}</div>
+       <div class="cNome">${c.nome}</div>
+       <div class="cDesc">${c.desc}</div>
+       <div class="vender">
+         <button class="vP">💰${vP}</button>
+         <button class="vB">💡${vB}</button>
+       </div>`;
+    el.querySelector(".vP").onclick = ()=>{ addPontos(vP); venderCarta(idx,"💰"); };
+    el.querySelector(".vB").onclick = ()=>{ brilho+=vB; venderCarta(idx,"💡"); };
+    box.appendChild(el);
+  });
+}
+function venderCarta(idx,tipo){
+  cartas.splice(idx,1);
+  bip(520,.08,"triangle");
+  popup(window.innerWidth/2, 300, "vendida "+tipo, "#ffd93d");
+  renderTudo(); renderCartas();
+}
+
+// ================= RECURSOS =================
+function addPontos(n){ pontos = Math.max(0, pontos+n); }
+
+// ================= NÍVEL / XP =================
+// quanto maior o nível, mais XP precisa (curva ~n^1.7)
+function xpAlvo(n){ return Math.round(20 * Math.pow(n, 1.7)); }
+function ganharXP(n){
+  xp += n;
+  let alvo = xpAlvo(nivel);
+  while(xp >= alvo){
+    xp -= alvo;
+    nivel++;
+    recompensaNivel();
+    alvo = xpAlvo(nivel);
+  }
+}
+function recompensaNivel(){
+  tocar('yippee');
+  const rec = nivel*4;          // pontos bônus escalam com o nível
+  addPontos(rec);
+  brilho += 4;
+  if(nivel % 5 === 0){ darCarta('rara'); festa("NÍVEL "+nivel+"! 🌈 carta rara!"); }
+  else festa("NÍVEL "+nivel+"! +"+rec+" pts");
+}
+
+// ================= RENDER BRILHO =================
+function renderBrilho(){
+  brilho = Math.max(0, Math.min(100, brilho));
+
+  let opEscuro = 0;
+  if(brilho < ZONA_MIN) opEscuro = (ZONA_MIN - brilho)/ZONA_MIN;
+  escuridao.style.opacity = opEscuro.toFixed(3);
+
+  let opBranco = 0;
+  if(brilho > ZONA_MAX) opBranco = (brilho - ZONA_MAX)/(100 - ZONA_MAX);
+  opBranco = Math.min(1, opBranco*1.35);
+  estouro.style.opacity = opBranco.toFixed(3);
+  if(brilho > ZONA_MAX){
+    document.body.classList.add("estourando");
+    estouro.style.boxShadow = `inset 0 0 ${120*opBranco}px ${60*opBranco}px #fff`;
+  } else {
+    document.body.classList.remove("estourando");
+    estouro.style.boxShadow = "none";
+  }
+
+  $("vBrilho").textContent = Math.round(brilho)+"%";
+  $("barBrilho").style.width = brilho+"%";
+
+  let s="", cor="#bbb";
+  if(brilho < 15){ s="🕳️ escuro demais, num vejo nada"; cor="#6ec6ff"; }
+  else if(brilho < ZONA_MIN){ s="🌒 ainda tá escuro…"; cor="#88a"; }
+  else if(brilho <= ZONA_MAX){ s="✅ ZONA BOA! aproveita"; cor="#6f6"; }
+  else if(brilho < 90){ s="🥵 clareando demais…"; cor="#ffb14e"; }
+  else { s="💥 ESTOUROU! tá me cegando"; cor="#ff5252"; }
+  const st=$("statusBrilho"); st.textContent=s; st.style.color=cor;
+
+  if(brilho >= 25) zonaDopa.classList.add("on"); else zonaDopa.classList.remove("on");
+}
+
+function renderTudo(){
+  $("vPontos").textContent = pontos;
+  $("vNivel").textContent = nivel;
+  const alvoXP = xpAlvo(nivel);
+  $("barXP").style.width = Math.min(100, xp/alvoXP*100) + "%";
+  $("xpTxt").textContent = Math.floor(xp) + " / " + alvoXP + " XP";
+  btnComprar.disabled = pontos < CUSTO_BRILHO;
+  $("btnSlot").disabled   = pontos < 5  || travado.slot;
+  $("btnLoot").disabled   = pontos < 15 || travado.loot;
+  $("btnRoleta").disabled = pontos < 8  || travado.roleta;
+  $("btnOvo").disabled    = pontos < CUSTO_OVO;
+  const chance = Math.min(85, risco*10);
+  $("btnRisco").textContent = `SUBIR (risco ${chance}%)`;
+  $("barraRisco").firstElementChild.style.width = chance+"%";
+  renderBrilho();
+}
+
+// ================= BOTÃO FUJÃO =================
+function posBtnBrilho(x,y){
+  const w=btnBrilho.offsetWidth, h=btnBrilho.offsetHeight;
+  x=Math.max(6,Math.min(window.innerWidth-w-6,x));
+  y=Math.max(56,Math.min(window.innerHeight-h-6,y));
+  btnBrilho.style.left=x+"px"; btnBrilho.style.top=y+"px";
+}
+posBtnBrilho(window.innerWidth/2-80, window.innerHeight-120);
+
+function fugirDe(px, py){
+  const r=btnBrilho.getBoundingClientRect();
+  const cx=r.left+r.width/2, cy=r.top+r.height/2;
+  const dx=px-cx, dy=py-cy, dist=Math.hypot(dx,dy);
+  if(dist<90){ const ang=Math.atan2(dy,dx), fuga=130; posBtnBrilho(r.left-Math.cos(ang)*fuga, r.top-Math.sin(ang)*fuga); }
+}
+document.addEventListener("mousemove", e=> fugirDe(e.clientX, e.clientY));
+document.addEventListener("touchmove", e=>{ const t=e.touches[0]; if(t) fugirDe(t.clientX, t.clientY); }, {passive:true});
+btnBrilho.addEventListener("click", e=>{
+  if(Math.random()<0.35){
+    posBtnBrilho(Math.random()*window.innerWidth, Math.random()*window.innerHeight);
+    bip(160,.1,"sawtooth"); popup(e.clientX,e.clientY,"escapou! 😈","#ff5252"); return;
+  }
+  brilho+=6; bip(600,.06,"sine"); popup(e.clientX,e.clientY,"+6% 💡","#6ec6ff"); renderBrilho();
+});
+
+// ================= DOPAMINA (clique principal) =================
+btnDopa.addEventListener("click", e=>{
+  streak++;
+  if(streak%5===0) comboMult=Math.min(comboMult+1,8);
+  const ganho = Math.max(1, comboMult + bonusPorClique());
+  addPontos(ganho);
+  brilho -= fatorEscurecimento();
+
+  bip(300+streak*8,.05,"square");
+  popup(e.clientX,e.clientY,"+"+ganho,"#ffd93d");
+  chuvaConfete(e.clientX,e.clientY); balanca(); mostraStreak();
+
+  ganharXP(ganho);   // clicar dá XP; upar fica mais difícil e dá recompensa
+
+  renderTudo();
+  clearTimeout(streakTimer);
+  streakTimer=setTimeout(()=>{ streak=0; comboMult=1; $("streak").style.opacity=0; },1200);
+});
+
+// ================= COMPRAR BRILHO =================
+btnComprar.addEventListener("click", ()=>{
+  if(pontos<CUSTO_BRILHO) return;
+  addPontos(-CUSTO_BRILHO); brilho+=GANHO_BRILHO;
+  bip(500,.1,"triangle");
+  popup(window.innerWidth/2,200,"-"+CUSTO_BRILHO+" pts","#ff9f43");
+  if(brilho>ZONA_MAX) popup(window.innerWidth/2,250,"cuidado, estourando! 💥","#ff5252");
+  renderTudo();
+});
+
+// ================= 🎰 SLOT =================
+const SIMBOLOS = ["🍒","🍋","🔔","💎","7️⃣"];
+const PAGA3 = { "🍒":15, "🍋":15, "🔔":30, "💎":50, "7️⃣":100 };
+const H_SYM = 64;      // altura de cada símbolo (bate com o CSS)
+const N_GIRO = 26;     // quantos símbolos passam voando antes de parar
+
+function girarReel(reel, alvo, dur, delay){
+  const strip = reel.querySelector(".strip");
+  let html = "";
+  for(let i=0;i<N_GIRO;i++) html += `<div class="sym">${SIMBOLOS[Math.random()*SIMBOLOS.length|0]}</div>`;
+  html += `<div class="sym">${alvo}</div>`;          // o resultado fica por último
+  strip.innerHTML = html;
+  strip.style.transition = "none";
+  strip.style.transform  = "translateY(0)";
+  strip.getBoundingClientRect();                      // força reflow
+  requestAnimationFrame(()=>{
+    strip.style.transition = `transform ${dur}ms cubic-bezier(.12,.72,.15,1) ${delay}ms`;
+    strip.style.transform  = `translateY(${-N_GIRO*H_SYM}px)`;
+  });
+}
+
+$("btnSlot").addEventListener("click", ()=>{
+  if(pontos<5||travado.slot) return;
+  addPontos(-5); travado.slot=true; renderTudo();
+
+  const reels = [$("r0"),$("r1"),$("r2")];
+  const res   = reels.map(()=>SIMBOLOS[Math.random()*SIMBOLOS.length|0]);
+  const durs  = [1500,1800,2100];
+  reels.forEach((r,i)=> girarReel(r, res[i], durs[i], i*100));
+
+  // som de "tec-tec" enquanto gira
+  let ticks=0;
+  const snd=setInterval(()=>{ bip(240+Math.random()*180,.02,"square",.06); if(++ticks>26) clearInterval(snd); },75);
+
+  setTimeout(()=>{
+    let premio=0, msg="";
+    if(res[0]===res[1] && res[1]===res[2]){ premio=PAGA3[res[0]]*multPremio(); msg="TRIPLO! 🎉"; tocar('fah'); }
+    else if(res[0]===res[1]||res[1]===res[2]||res[0]===res[2]){ premio=5*multPremio(); msg="par!"; }
+    if(premio>0){
+      addPontos(premio); popup(window.innerWidth/2,240,"+"+premio+" "+msg,"#7CFC7C");
+      bip(700,.15,"square"); if(premio>=30) festa(msg+" +"+premio);
+    } else { popup(window.innerWidth/2,240,"nada 😐","#888"); bip(150,.15,"sawtooth"); }
+    travado.slot=false; renderTudo();
+  }, 2100 + 2*100 + 120);
+});
+
+// ================= 🎁 LOOT BOX =================
+$("btnLoot").addEventListener("click", ()=>{
+  if(pontos<15||travado.loot) return;
+  addPontos(-15); travado.loot=true; renderTudo();
+  const caixa=$("caixa"); caixa.classList.add("mexe");
+  bip(300,.1,"square");
+  setTimeout(()=>{
+    caixa.classList.remove("mexe");
+    const mp = multPremio();
+    const r=Math.random();
+    if(r<0.30){ const g=Math.round((8+Math.random()*14|0)*mp); addPontos(g); popup(window.innerWidth/2,240,"+"+g+" pts","#ffd93d"); }
+    else if(r<0.50){ const g=Math.round((8+Math.random()*10|0)*mp); brilho+=g; popup(window.innerWidth/2,240,"+"+g+"% brilho","#6ec6ff"); }
+    else if(r<0.85){ darCarta('comum'); }
+    else if(r<0.96){ const g=Math.round(50*mp); addPontos(g); popup(window.innerWidth/2,240,"+"+g+" pts ✨","#7CFC7C"); festa("ÉPICO! +"+g+" ✨"); }
+    else { darCarta('rara'); festa("LENDÁRIO! 🌈"); }
+    caixa.textContent="🎉"; setTimeout(()=>caixa.textContent="🎁",700);
+    travado.loot=false; renderTudo();
+  },800);
+});
+
+// ================= 🎡 ROLETA =================
+// segmentos na ordem do conic-gradient (45° cada)
+const SEG = [
+  {txt:"+40 pontos",   cor:"#00e676", fn:()=>{ const g=Math.round(40*multPremio()); addPontos(g); return "+"+g+" pontos"; }},
+  {txt:"ZEROU NÍVEL 💀",cor:"#ff1744", fn:()=>{ nivel=1; xp=0; }},
+  {txt:"+25 brilho",   cor:"#00b0ff", fn:()=>{ const g=Math.round(25*multPremio()); brilho+=g; return "+"+g+" brilho"; }},
+  {txt:"+ carta 🃏",    cor:"#d500f9", fn:()=>darCarta('comum')},
+  {txt:"PONTOS x2",    cor:"#ffea00", fn:()=>pontos*=2},
+  {txt:"ZEROU PONTOS 💸",cor:"#ff3d00", fn:()=>pontos=0},
+  {txt:"-25 brilho",   cor:"#7c4dff", fn:()=>brilho-=25},
+  {txt:"CARTA RARA 🌈", cor:"#1de9b6", fn:()=>darCarta('rara')},
+];
+$("btnRoleta").addEventListener("click", ()=>{
+  if(pontos<8||travado.roleta) return;
+  addPontos(-8); travado.roleta=true; renderTudo();
+  const i = Math.random()*8|0;
+  const desiredMod = (360 - (i*45+22.5)) % 360;
+  const atual = ((rotTotal%360)+360)%360;
+  const delta = ((desiredMod - atual)%360 + 360)%360;
+  rotTotal += 360*4 + delta;
+  $("roda").style.transform = `rotate(${rotTotal}deg)`;
+  bip(400,.1,"triangle");
+  setTimeout(()=>{
+    const seg = SEG[i];
+    const txt = seg.fn() || seg.txt;   // fn pode devolver o valor já dobrado
+    const bom = !seg.txt.includes("ZEROU") && !seg.txt.includes("-25");
+    popup(window.innerWidth/2, 240, txt, seg.cor);
+    if(bom){ chuvaConfete(window.innerWidth/2,240); bip(700,.12,"square"); }
+    else { bip(150,.25,"sawtooth"); balanca(); tocar('boom'); }
+    travado.roleta=false; renderTudo();
+  },3300);
+});
+
+// ================= 🎲 BOTÃO ARRISCADO =================
+$("btnRisco").addEventListener("click", ()=>{
+  const chance = Math.min(0.85, risco*0.10);
+  if(Math.random() < chance){
+    nivel = 1; risco = 0; xp = 0;
+    festa("RESETOU! 💀 nível 1");
+    bip(120,.4,"sawtooth"); balanca(); tocar('boom');
+    popup(window.innerWidth/2,240,"você foi ganancioso 😈","#ff5252");
+  } else {
+    nivel++; risco++; xp = 0;
+    bip(500+nivel*20,.08,"square");
+    popup(window.innerWidth/2,240,"NÍVEL "+nivel+"! 🎲","#ff7ce5");
+    chuvaConfete(window.innerWidth/2,240);
+  }
+  renderTudo();
+});
+
+// ================= 🐾 PETS =================
+// troque `emoji` por `img:'nome.png'` quando tiver as imagens
+const PETS = [
+  { id:'pedro',     nome:'Pedro',                 emoji:'🐵', peso:30, pts:1,  tier:'comum'    },
+  { id:'akio',      nome:'Akio',                  emoji:'🇯🇵', peso:30, pts:2,  tier:'comum'    },
+  { id:'ocorrencia',nome:'Ocorrência',            emoji:'📄', peso:28, pts:2,  tier:'comum'    },
+  { id:'milhao',    nome:'No Mínimo Um Milhão',   emoji:'💯', peso:18, pts:3,  tier:'incomum'  },
+  { id:'aguia',     nome:'Águia das Referências', emoji:'🦅', img:'aguia das refs.jpeg', peso:9,  pts:5,  tier:'raro'     },
+  { id:'misterio',  nome:'Homem Misterioso',      emoji:'🥸', img:'homem misterioso.jpg', peso:9,  pts:5,  tier:'raro'     },
+  { id:'ex',        nome:'EX',                    emoji:'💔', peso:2,  pts:10, xp:5, tier:'lendario' },
+];
+function petVisual(p){ return p.img ? `<img src="${p.img}" alt="${p.nome}">` : p.emoji; }
+
+function sortearPet(){
+  const total = PETS.reduce((a,p)=>a+p.peso,0);
+  let r = Math.random()*total;
+  for(const p of PETS){ if((r-=p.peso) < 0) return p; }
+  return PETS[0];
+}
+
+function ganharPet(){
+  const p = sortearPet();
+  const novo = !pets[p.id];
+  pets[p.id] = (pets[p.id]||0) + 1;
+  const lenda = p.tier === 'lendario';
+  bip(lenda?900:600, .12, "sine");
+  popup(window.innerWidth/2, 240, (novo?"NOVO PET! ":"PET ")+p.emoji+" "+p.nome, lenda?'#ff4d6d':'#7CFC7C');
+  chuvaConfete(window.innerWidth/2, 240);
+  if(lenda){ festa("PET LENDÁRIO! 💔 EX"); tocar('fah'); }
+}
+
+$("btnOvo").addEventListener("click", ()=>{
+  if(pontos < CUSTO_OVO) return;
+  addPontos(-CUSTO_OVO);
+  const mp = multPremio();
+  const r = Math.random();
+  if(r < 0.35){                       // pontos (35%)
+    const g = Math.round((15+Math.random()*30|0)*mp);
+    addPontos(g); bip(500,.1,"sine"); popup(window.innerWidth/2,240,"+"+g+" pts","#ffd93d");
+  } else if(r < 0.57){                // brilho (22%)
+    const g = Math.round((6+Math.random()*10|0)*mp);
+    brilho += g; bip(520,.1,"sine"); popup(window.innerWidth/2,240,"+"+g+"% brilho","#6ec6ff");
+  } else if(r < 0.75){                // carta comum (18%)
+    darCarta('comum');
+  } else if(r < 0.80){                // carta rara (5%)
+    darCarta('rara');
+  } else {                            // PET (20%, sorteado por raridade)
+    ganharPet();
+  }
+  renderPets(); renderTudo();
+});
+
+function rendaPets(){   // cada pet rende só 1× (duplicatas não somam)
+  let dp=0, dx=0;
+  PETS.forEach(p=>{ if((pets[p.id]||0) > 0){ dp += p.pts; dx += (p.xp||0); } });
+  return { dp, dx };
+}
+
+// valor de venda de cada DUPLICATA, por raridade
+const VENDA_PET = {
+  comum:    { pts: 30,  bri: 35  },
+  incomum:  { pts: 50,  bri: 55  },
+  raro:     { pts: 100, bri: 110 },
+  lendario: { pts: 300, bri: 300 },
+};
+function venderPet(id, tipo){
+  const c = pets[id]||0;
+  if(c <= 1) return;                 // mantém sempre 1 na coleção
+  const p = PETS.find(x=>x.id===id);
+  const v = VENDA_PET[p.tier];
+  pets[id] = c - 1;
+  if(tipo==='pts'){ addPontos(v.pts); popup(window.innerWidth/2, 300, "+"+v.pts+" 💰", "#ffd93d"); }
+  else            { brilho += v.bri;  popup(window.innerWidth/2, 300, "+"+v.bri+" 💡", "#6ec6ff"); }
+  bip(520,.08,"triangle");
+  renderPets(); renderTudo();
+}
+
+function renderPets(){
+  const box = $("petsBox"); box.innerHTML = "";
+  PETS.forEach(p=>{
+    const c = pets[p.id]||0;
+    const el = document.createElement("div");
+    el.className = "pet " + p.tier + (c? "" : " bloq");
+    let rate = `+${p.pts} pt`;
+    if(p.xp)  rate += ` · +${p.xp} XP/s`;
+    const v = VENDA_PET[p.tier];
+    el.innerHTML =
+      `<div class="petEmoji">${c? petVisual(p) : "❔"}</div>
+       <div class="petNome">${c? p.nome : "???"}</div>
+       <div class="petRate">${c? rate : "não encontrado"}</div>
+       ${c? `<div class="petQtd">x${c}</div>` : ""}
+       ${c>1 ? `<div class="petVender">
+                  <button class="vP">💰${v.pts}</button>
+                  <button class="vB">💡${v.bri}</button>
+                </div>
+                <div class="petExtra">${c-1} extra${c-1>1?'s':''} p/ vender</div>` : ""}`;
+    box.appendChild(el);
+    if(c>1){
+      el.querySelector(".vP").onclick = ()=> venderPet(p.id,'pts');
+      el.querySelector(".vB").onclick = ()=> venderPet(p.id,'bri');
+    }
+  });
+  const { dp, dx } = rendaPets();
+  let tot = `renda passiva: +${dp} pts a cada 2s`;
+  if(dx>0) tot += `  ·  +${dx} XP/s`;
+  $("petTotal").textContent = tot;
+}
+
+// renda passiva a cada 2s (só pontos)
+setInterval(()=>{
+  const { dp } = rendaPets();
+  if(dp>0){ addPontos(dp); renderTudo(); }
+}, 2000);
+
+// XP dos pets a cada 1s (ex.: EX dá 5 XP/s)
+setInterval(()=>{
+  const { dx } = rendaPets();
+  if(dx>0){ ganharXP(dx); renderTudo(); }
+}, 1000);
+
+// ================= EFEITOS =================
+function popup(x,y,txt,cor){
+  const el=document.createElement("div"); el.className="pop"; el.textContent=txt;
+  el.style.left=x+"px"; el.style.top=y+"px"; el.style.color=cor;
+  document.body.appendChild(el); setTimeout(()=>el.remove(),900);
+}
+const cores=["#ff5252","#ffd93d","#6ec6ff","#6f6","#ff7ce5","#ff9f43","#fff"];
+function chuvaConfete(x,y){
+  for(let i=0;i<14;i++){
+    const c=document.createElement("div"); c.className="confete";
+    c.style.left=x+"px"; c.style.top=y+"px"; c.style.background=cores[Math.random()*cores.length|0];
+    document.body.appendChild(c);
+    const ang=Math.random()*Math.PI*2, vel=60+Math.random()*120;
+    const dx=Math.cos(ang)*vel, dy=Math.sin(ang)*vel-60, rot=Math.random()*720-360;
+    c.animate([{transform:"translate(0,0) rotate(0deg)",opacity:1},
+      {transform:`translate(${dx}px,${dy+220}px) rotate(${rot}deg)`,opacity:0}],
+      {duration:900+Math.random()*400,easing:"cubic-bezier(.2,.6,.3,1)"});
+    setTimeout(()=>c.remove(),1300);
+  }
+}
+function balanca(){ const m=$("mundo"); m.animate([{transform:"translate(0,0)"},
+  {transform:`translate(${Math.random()*8-4}px,${Math.random()*8-4}px)`},{transform:"translate(0,0)"}],{duration:90}); }
+function mostraStreak(){ if(streak<3) return; const s=$("streak"); s.textContent=`🔥 ${streak} seguidos!  x${comboMult}`; s.style.opacity=1; }
+function festa(txt){
+  const g=$("ganhou"); g.textContent=txt; g.style.display="flex";
+  bip(700,.12,"square"); setTimeout(()=>bip(900,.12,"square"),100); setTimeout(()=>bip(1200,.2,"square"),200);
+  for(let i=0;i<40;i++) setTimeout(()=>chuvaConfete(Math.random()*window.innerWidth,Math.random()*window.innerHeight*.6),i*20);
+  setTimeout(()=>{ g.style.display="none"; },1200);
+}
+
+// ================= DECAIMENTO =================
+setInterval(()=>{ if(brilho>2 && !cortizolLigado()){ brilho-=fatorDecaimento(); renderBrilho(); } },1000);
+
+// ================= 🧘 LOW CORTISOL =================
+let cortizolAtivoAte = 0, cortizolCooldownAte = 0;
+const CORTIZOL_DURACAO = 10*60*1000;   // 10 min de tela estável
+const CORTIZOL_RECARGA = 30*60*1000;   // recarrega a cada 30 min
+function cortizolLigado(){ return Date.now() < cortizolAtivoAte; }
+function fmtTempo(ms){ ms=Math.max(0,ms); const s=Math.ceil(ms/1000); return String(Math.floor(s/60)).padStart(2,'0')+":"+String(s%60).padStart(2,'0'); }
+
+$("btnCortizol").addEventListener("click", ()=>{
+  const agora = Date.now();
+  if(agora < cortizolCooldownAte) return;   // ainda recarregando
+  cortizolAtivoAte = agora + CORTIZOL_DURACAO;
+  cortizolCooldownAte = agora + CORTIZOL_RECARGA;
+  bip(320,.2,"sine"); setTimeout(()=>bip(430,.25,"sine"),120);
+  popup(window.innerWidth/2, 220, "🧘 tela estável por 10 min", "#4dd0a7");
+  atualizaCortizol();
+});
+
+function atualizaCortizol(){
+  const agora = Date.now(), btn = $("btnCortizol"), ind = $("cortizolInd");
+  if(cortizolLigado()){
+    btn.textContent = "🧘 ATIVO "+fmtTempo(cortizolAtivoAte-agora);
+    btn.disabled = true;
+    ind.style.display = "block";
+    ind.textContent = "🧘 tela estável "+fmtTempo(cortizolAtivoAte-agora);
+  } else if(agora < cortizolCooldownAte){
+    btn.textContent = "🕒 recarrega "+fmtTempo(cortizolCooldownAte-agora);
+    btn.disabled = true;
+    ind.style.display = "none";
+  } else {
+    btn.textContent = "🧘 ATIVAR";
+    btn.disabled = false;
+    ind.style.display = "none";
+  }
+}
+setInterval(atualizaCortizol, 1000);
+atualizaCortizol();
+
+// ================= NOTIFICAÇÃO FALSA =================
+const noti=$("noti");
+function soltaNoti(){ noti.classList.add("on"); bip(880,.08,"sine"); }
+noti.querySelector(".x").addEventListener("click", e=>{ e.stopPropagation(); noti.classList.remove("on"); setTimeout(soltaNoti,6000); });
+noti.addEventListener("click", ()=>{ addPontos(3); noti.classList.remove("on"); popup(window.innerWidth/2, window.innerHeight/2, "+3 🎁","#ffd93d"); renderTudo(); setTimeout(soltaNoti,9000); });
+setTimeout(soltaNoti,4000);
+
+// ================= MUTE =================
+$("btnMute").addEventListener("click", ()=>{ somLigado=!somLigado; $("btnMute").textContent=somLigado?"🔊 som":"🔇 mudo"; });
+
+// ================= ABAS =================
+document.querySelectorAll(".abaBtn").forEach(b=>{
+  b.addEventListener("click", ()=>{
+    document.querySelectorAll(".abaBtn").forEach(x=>x.classList.remove("ativa"));
+    b.classList.add("ativa");
+    document.querySelectorAll(".pane").forEach(p=>p.hidden=true);
+    $("pane-"+b.dataset.aba).hidden=false;
+  });
+});
+
+// ================= RÓTULOS DA ROLETA =================
+const SEG_LABEL = ["+40 PTS","ZERA\nNÍVEL 💀","+25\nBRILHO","+ CARTA 🃏","PONTOS\nx2 ✨","ZERA\nPONTOS 💸","-25\nBRILHO","CARTA\nRARA 🌈"];
+function montaLabels(){
+  const roda=$("roda");
+  SEG_LABEL.forEach((t,i)=>{
+    const mid = i*45+22.5;               // centro da fatia (0° = topo)
+    const el=document.createElement("div");
+    el.className="rlabel";
+    el.innerHTML = t.replace(/\n/g,"<br>");
+    // posiciona no raio e inclina radialmente
+    el.style.transform=`translate(-50%,-50%) rotate(${mid}deg) translateY(-96px)`;
+    roda.appendChild(el);
+  });
+}
+montaLabels();
+
+// ================= INÍCIO =================
+dica.innerHTML = "clique dá pontos… mas <b>escurece a tela</b> 😈 — gaste pontos nas máquinas, mas cuidado pra não <b>estourar</b> nem ficar ganancioso!";
+window.addEventListener("resize", ()=> posBtnBrilho(btnBrilho.offsetLeft, btnBrilho.offsetTop));
+renderCartas(); renderPets(); renderTudo();
+</script>
+</body>
+</html>
