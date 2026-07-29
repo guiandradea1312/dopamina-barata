@@ -241,6 +241,8 @@
   }
   .vP { background: #4a3f00; color: #ffd93d; }
   .vB { background: #10303f; color: #6ec6ff; }
+  .petVenderD { margin-top: 4px; }
+  .vPD, .vBD { flex: 1; font-family: inherit; font-size: 11px; font-weight: bold; border: none; border-radius: 6px; padding: 4px 0; cursor: pointer; background: #6a4a00; color: #ffcf40; }
 
   /* ===== pets ===== */
   #petTotal { font-size: 12px; color: #9ecb9e; margin: 10px 0 6px; text-align: center; }
@@ -1204,6 +1206,18 @@ function venderPet(id, tipo){
   bip(520,.08,"triangle");
   renderPets(); renderTudo();
 }
+// dourado extra vale 3× (custou 3 normais); mantém sempre 1 dourado
+function venderPetDourado(id, tipo){
+  const g = petsDourados[id]||0;
+  if(g <= 1) return;                 // só vende os que passam de 1
+  const p = PETS.find(x=>x.id===id);
+  const v = VENDA_PET[p.tier];
+  petsDourados[id] = g - 1;
+  if(tipo==='pts'){ const val=v.pts*3; addPontos(val); popup(window.innerWidth/2, 300, "+"+val+" 💰✨", "#ffcf40"); }
+  else            { const val=v.bri*3; brilho += val; popup(window.innerWidth/2, 300, "+"+val+" 💡✨", "#ffcf40"); }
+  bip(560,.08,"triangle");
+  renderPets(); renderTudo();
+}
 
 function renderPets(){
   // 📖 Pokédex: cabeçalho de coleção
@@ -1234,12 +1248,21 @@ function renderPets(){
                   <button class="vP">💰${v.pts}</button>
                   <button class="vB">💡${v.bri}</button>
                 </div>
-                <div class="petExtra">${c-1} extra${c-1>1?'s':''} p/ vender</div>` : ""}`;
+                <div class="petExtra">${c-1} extra${c-1>1?'s':''} p/ vender</div>` : ""}
+       ${g>1 ? `<div class="petVender petVenderD">
+                  <button class="vPD">💰✨${v.pts*3}</button>
+                  <button class="vBD">💡✨${v.bri*3}</button>
+                </div>
+                <div class="petExtra">${g-1} dourado${g-1>1?'s':''} extra p/ vender</div>` : ""}`;
     box.appendChild(el);
     if(c>=3) el.querySelector(".petFundir").onclick = ()=> fundirPet(p.id);
     if(c>1){
       el.querySelector(".vP").onclick = ()=> venderPet(p.id,'pts');
       el.querySelector(".vB").onclick = ()=> venderPet(p.id,'bri');
+    }
+    if(g>1){
+      el.querySelector(".vPD").onclick = ()=> venderPetDourado(p.id,'pts');
+      el.querySelector(".vBD").onclick = ()=> venderPetDourado(p.id,'bri');
     }
   });
   const { dp, dx } = rendaPets();
