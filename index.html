@@ -218,6 +218,10 @@
   .carta .ruim { color: #ff8a8a; }
   .carta.raro { background: #0d0d16; animation: rgbBorda 3s linear infinite; }
   .carta.raro .cNome { color: #ffe27a; text-shadow: 0 0 8px #ffcf4088; }
+  .carta.turbo { background: linear-gradient(160deg,#2a2205,#12100a); border-color: #ffcf40; box-shadow: 0 0 14px #ffcf4066; }
+  .carta.turbo .cNome { color: #ffcf40; text-shadow: 0 0 8px #ffcf4088; }
+  .carta .cEmoji { position: relative; }
+  .carta .cNv { position: absolute; top: -4px; right: -6px; font-size: 11px; background: #ffcf40; color: #201800; font-weight: bold; padding: 0 4px; border-radius: 6px; }
   @keyframes rgbBorda {
     0%  { border-color:#ff2d2d; box-shadow:0 0 12px #ff2d2daa; }
     16% { border-color:#ff9d00; box-shadow:0 0 12px #ff9d00aa; }
@@ -265,7 +269,15 @@
     border: none; border-radius: 6px; padding: 4px 0; cursor: pointer;
   }
   .pet .petExtra { font-size: 10px; color: #888; margin-top: 3px; }
+  .pet.dourado { border-color: #ffcf40; box-shadow: 0 0 16px #ffcf4088; background: linear-gradient(160deg,#241d05,#15130c); }
+  .pet.dourado .petNome { color: #ffcf40; }
+  .petEmoji { position: relative; }
+  .petGold { position: absolute; top: -2px; right: -10px; font-size: 18px; filter: drop-shadow(0 0 4px #ffcf40); }
+  .pet .petFundir { margin-top: 7px; width: 100%; font-family: inherit; font-size: 10px; font-weight: bold; border: none; border-radius: 6px; padding: 5px 0; cursor: pointer; background: #6a4a00; color: #ffe27a; }
   #petDica { font-size: 11px; color: #999; margin-bottom: 6px; text-align: center; }
+  #petDex { font-size: 12px; color: #cde; text-align: center; margin-bottom: 6px; max-width: 340px; }
+  #petDex .dexBar { height: 8px; background: #222; border-radius: 6px; overflow: hidden; margin-top: 5px; }
+  #petDex .dexBar i { display: block; height: 100%; background: linear-gradient(90deg,#4a7a4a,#ffcf40); }
 
   /* ===== batalha ===== */
   .btn-vermelho2 { background: linear-gradient(#ff5252,#a30000); }
@@ -543,8 +555,9 @@
     <!-- ABA: CARTAS -->
     <div class="pane" id="pane-cartas" hidden>
       <div class="mao">
-        <div class="maoTitulo" id="maoTitulo">🃏 Sua mão (0/6) — cartas dão efeito enquanto na mão</div>
+        <div class="maoTitulo" id="maoTitulo">🃏 Sua mão (0/8) — cartas dão efeito enquanto na mão</div>
         <div id="cartasBox" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;"></div>
+        <button class="btn btn-roxo" id="btnFundirCartas" style="max-width:300px;margin-top:10px">🔀 Fundir 3 iguais → carta turbinada</button>
       </div>
     </div>
 
@@ -595,7 +608,8 @@
     <!-- ABA: PETS -->
     <div class="pane" id="pane-pets" hidden>
       <button class="btn btn-roxo" id="btnOvo" style="max-width:280px">🥚 abrir ovo (40 pts)</button>
-      <div id="petDica">cada pet rende só 1× — as cópias repetidas você vende 💰</div>
+      <div id="petDex"></div>
+      <div id="petDica">cada pet rende 1× (✨ dourado rende 2,5×) — junte 3 iguais pra fundir ou venda as cópias 💰</div>
       <div id="petTotal">renda passiva: +0 pts a cada 2s</div>
       <div class="petsGrid" id="petsBox"></div>
     </div>
@@ -695,6 +709,7 @@ let streak = 0, streakTimer = null, comboMult = 1;
 let somLigado = true;
 let risco = 0, xp = 0;
 let pets = {};   // id -> quantidade
+let petsDourados = {};   // id -> quantidade de versões douradas (fusão de 3)
 let cartas = [];            // mão do jogador
 let rotTotal = 0;           // rotação acumulada da roleta
 let travado = { slot:false, roleta:false, loot:false };
@@ -702,7 +717,7 @@ let travado = { slot:false, roleta:false, loot:false };
 const CUSTO_BRILHO = 10, GANHO_BRILHO = 12;
 const CUSTO_OVO = 40;
 const ZONA_MIN = 45, ZONA_MAX = 75;
-const MAO_MAX = 6;
+const MAO_MAX = 8;
 
 // ================= CATÁLOGO DE CARTAS =================
 // mods: clique (+/- pts por clique) | escurec/decai/premio (multiplicadores, 1 = neutro)
@@ -781,18 +796,48 @@ function darCarta(raridade){   // 'comum' ou 'rara'
   renderCartas();
 }
 
+// 🔀 fusão: chave de agrupamento (mesma carta + mesmo nível de fusão)
+function chaveCarta(c){ return c.id + '|' + (c.nivel||1); }
+function turbinarCarta(c){
+  const m = { ...c.mods };
+  if(m.clique != null) m.clique = m.clique > 0 ? m.clique*2 : 0;      // dobra bônus, remove penalidade
+  if(m.premio != null) m.premio = m.premio >= 1 ? m.premio*1.3 : 1;   // reforça, tira downside
+  if(m.escurec != null) m.escurec = m.escurec > 1 ? m.escurec*0.7 : m.escurec*0.8;
+  if(m.decai != null)   m.decai   = m.decai   > 1 ? m.decai*0.7   : m.decai*0.8;
+  const nivel = (c.nivel||1)+1;
+  return { ...c, mods:m, nivel, turbo:true, nome: c.nome.replace(/^★+ /,'') };
+}
+function grupoFundivel(){
+  const mapa = {};
+  cartas.forEach((c,i)=>{ const k=chaveCarta(c); (mapa[k]=mapa[k]||[]).push(i); });
+  for(const k in mapa){ if(mapa[k].length>=3) return mapa[k]; }
+  return null;
+}
+function fundirCartas(){
+  const g = grupoFundivel();
+  if(!g){ popup(window.innerWidth/2, 260, "precisa de 3 iguais 🃏", "#ff5252"); return; }
+  const base = cartas[g[0]];
+  const nova = turbinarCarta(base);
+  // remove 3 (índices em ordem decrescente pra não bagunçar)
+  g.slice(0,3).sort((a,b)=>b-a).forEach(i=> cartas.splice(i,1));
+  cartas.push(nova);
+  bip(950,.14,"sine"); tocar('fah'); chuvaConfete(window.innerWidth/2, 240);
+  popup(window.innerWidth/2, 240, "★ CARTA TURBINADA Nv"+nova.nivel+" "+nova.emoji, "#ffcf40");
+  renderCartas(); renderTudo();
+}
 function renderCartas(){
   $("maoTitulo").textContent = `🃏 Sua mão (${cartas.length}/${MAO_MAX}) — cartas dão efeito enquanto na mão`;
   const box = $("cartasBox");
   box.innerHTML = "";
   cartas.forEach((c,idx)=>{
-    const vP = c.raro?30:15, vB = c.raro?35:18;
+    const nv = c.nivel||1;
+    const vP = Math.round((c.raro?30:15) * nv), vB = Math.round((c.raro?35:18) * nv);
     const el = document.createElement("div");
-    el.className = "carta " + (c.raro?"raro":"comum");
+    el.className = "carta " + (c.turbo ? "turbo" : (c.raro?"raro":"comum"));
     el.innerHTML =
-      `<div class="cEmoji">${c.emoji}</div>
-       <div class="cNome">${c.nome}</div>
-       <div class="cDesc">${c.desc}</div>
+      `<div class="cEmoji">${c.emoji}${nv>1?`<span class="cNv">★${nv}</span>`:''}</div>
+       <div class="cNome">${nv>1?'★ ':''}${c.nome}</div>
+       <div class="cDesc">${c.desc}${nv>1?'<br><span style="color:#ffcf40">★ reforçada</span>':''}</div>
        <div class="vender">
          <button class="vP">💰${vP}</button>
          <button class="vB">💡${vB}</button>
@@ -801,6 +846,8 @@ function renderCartas(){
     el.querySelector(".vB").onclick = ()=>{ brilho+=vB; venderCarta(idx,"💡"); };
     box.appendChild(el);
   });
+  const btnF = $("btnFundirCartas");
+  if(btnF){ const pode = !!grupoFundivel(); btnF.disabled = !pode; btnF.style.opacity = pode?1:.5; }
 }
 function venderCarta(idx,tipo){
   cartas.splice(idx,1);
@@ -808,6 +855,7 @@ function venderCarta(idx,tipo){
   popup(window.innerWidth/2, 300, "vendida "+tipo, "#ffd93d");
   renderTudo(); renderCartas();
 }
+$("btnFundirCartas").addEventListener("click", fundirCartas);
 
 // ================= RECURSOS =================
 function addPontos(n){
@@ -1076,7 +1124,18 @@ const PETS = [
   { id:'misterio',  nome:'Homem Misterioso',      emoji:'🥸', img:'homem misterioso.jpg', peso:9,  pts:5,  tier:'raro'     },
   { id:'ex',        nome:'EX',                    emoji:'💔', peso:2,  pts:10, xp:5, tier:'lendario' },
 ];
+const GOLD_MULT = 2.5;   // dourado rende 2,5× do normal
 function petVisual(p){ return p.img ? `<img src="${p.img}" alt="${p.nome}">` : p.emoji; }
+const temAlgumPet = id => (pets[id]||0) > 0 || (petsDourados[id]||0) > 0;
+function fundirPet(id){
+  if((pets[id]||0) < 3){ popup(window.innerWidth/2, 260, "precisa de 3 iguais 🥚", "#ff5252"); return; }
+  pets[id] -= 3;
+  petsDourados[id] = (petsDourados[id]||0) + 1;
+  const p = PETS.find(x=>x.id===id);
+  bip(950,.14,"sine"); tocar('fah'); chuvaConfete(window.innerWidth/2, 240);
+  popup(window.innerWidth/2, 240, "✨ PET DOURADO! "+petVisual(p)+" "+p.nome, "#ffcf40");
+  renderPets(); renderTudo();
+}
 
 function sortearPet(){
   const total = PETS.reduce((a,p)=>a+p.peso,0);
@@ -1118,10 +1177,13 @@ $("btnOvo").addEventListener("click", ()=>{
   renderPets(); renderTudo();
 });
 
-function rendaPets(){   // cada pet rende só 1× (duplicatas não somam)
+function rendaPets(){   // cada pet rende 1× (ou 2,5× se dourado); duplicatas não somam
   let dp=0, dx=0;
-  PETS.forEach(p=>{ if((pets[p.id]||0) > 0){ dp += p.pts; dx += (p.xp||0); } });
-  return { dp, dx };
+  PETS.forEach(p=>{
+    const mult = (petsDourados[p.id]||0) > 0 ? GOLD_MULT : ((pets[p.id]||0) > 0 ? 1 : 0);
+    if(mult){ dp += p.pts*mult; dx += (p.xp||0)*mult; }
+  });
+  return { dp: Math.round(dp), dx: Math.round(dx*10)/10 };
 }
 
 // valor de venda de cada DUPLICATA, por raridade
@@ -1144,25 +1206,37 @@ function venderPet(id, tipo){
 }
 
 function renderPets(){
+  // 📖 Pokédex: cabeçalho de coleção
+  const donos = PETS.filter(p=>temAlgumPet(p.id)).length;
+  const dourados = PETS.filter(p=>(petsDourados[p.id]||0)>0).length;
+  const pct = Math.round(donos/PETS.length*100);
+  $("petDex").innerHTML =
+    `📖 Coleção: <b>${donos}/${PETS.length}</b> (${pct}%) · ✨ dourados: <b>${dourados}/${PETS.length}</b>
+     <div class="dexBar"><i style="width:${pct}%"></i></div>`;
+
   const box = $("petsBox"); box.innerHTML = "";
   PETS.forEach(p=>{
     const c = pets[p.id]||0;
+    const g = petsDourados[p.id]||0;
+    const tem = c>0 || g>0;
     const el = document.createElement("div");
-    el.className = "pet " + p.tier + (c? "" : " bloq");
-    let rate = `+${p.pts} pt`;
-    if(p.xp)  rate += ` · +${p.xp} XP/s`;
+    el.className = "pet " + p.tier + (tem? "" : " bloq") + (g>0? " dourado":"");
+    let rate = g>0 ? `+${Math.round(p.pts*GOLD_MULT)} pt ✨` : `+${p.pts} pt`;
+    if(p.xp)  rate += ` · +${g>0?Math.round(p.xp*GOLD_MULT):p.xp} XP/s`;
     const v = VENDA_PET[p.tier];
     el.innerHTML =
-      `<div class="petEmoji">${c? petVisual(p) : "❔"}</div>
-       <div class="petNome">${c? p.nome : "???"}</div>
-       <div class="petRate">${c? rate : "não encontrado"}</div>
-       ${c? `<div class="petQtd">x${c}</div>` : ""}
+      `<div class="petEmoji">${tem? petVisual(p) : "❔"}${g>0?'<span class="petGold">✨</span>':''}</div>
+       <div class="petNome">${tem? (g>0?'✨ ':'')+p.nome : "???"}</div>
+       <div class="petRate">${tem? rate : "não encontrado"}</div>
+       ${tem? `<div class="petQtd">x${c}${g>0?` · ✨${g}`:''}</div>` : ""}
+       ${c>=3 ? `<button class="petFundir">🔀 fundir 3 → ✨</button>` : ""}
        ${c>1 ? `<div class="petVender">
                   <button class="vP">💰${v.pts}</button>
                   <button class="vB">💡${v.bri}</button>
                 </div>
                 <div class="petExtra">${c-1} extra${c-1>1?'s':''} p/ vender</div>` : ""}`;
     box.appendChild(el);
+    if(c>=3) el.querySelector(".petFundir").onclick = ()=> fundirPet(p.id);
     if(c>1){
       el.querySelector(".vP").onclick = ()=> venderPet(p.id,'pts');
       el.querySelector(".vB").onclick = ()=> venderPet(p.id,'bri');
@@ -1350,7 +1424,7 @@ const CONQUISTAS = [
   { id:'nivel10', emoji:'🎚️', nome:'Subindo',        desc:'chegue ao nível 10',  cond:()=>nivel>=10 },
   { id:'rico',    emoji:'💰', nome:'Rico',           desc:'tenha 2000 pontos',   cond:()=>pontos>=2000 },
   { id:'petEX',   emoji:'💔', nome:'Coração partido',desc:'consiga o pet EX',    cond:()=>(pets.ex||0)>0 },
-  { id:'colecao', emoji:'🐾', nome:'Colecionador',   desc:'tenha todos os pets', cond:()=>PETS.every(p=>(pets[p.id]||0)>0) },
+  { id:'colecao', emoji:'🐾', nome:'Colecionador',   desc:'tenha todos os pets', cond:()=>PETS.every(p=>temAlgumPet(p.id)) },
   { id:'renascer',emoji:'⭐', nome:'Renascido',       desc:'renasça 1 vez',       cond:()=>estrelas>=1 },
   { id:'onda10',  emoji:'⚔️', nome:'Guerreiro',       desc:'chegue à onda 10',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=10 },
   { id:'onda25',  emoji:'👹', nome:'Caça-chefão',     desc:'chegue à onda 25',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=25 },
@@ -1401,7 +1475,7 @@ function renderExtra(){
 }
 function renderStats(){
   const box=$("extraStats"); if(!box) return;
-  const petsTem = PETS.filter(p=>(pets[p.id]||0)>0).length;
+  const petsTem = PETS.filter(p=>temAlgumPet(p.id)).length;
   const recOnda = window.getRecordeOnda ? window.getRecordeOnda() : 0;
   const stats = [
     ['⭐ Nível',        nivel],
@@ -1561,8 +1635,8 @@ renderCartas(); renderPets(); renderTudo();
   ];
 
   const $b = id => document.getElementById(id);
-  function petBonus(){ let d=0,v=0; PETS.forEach(p=>{ if((pets[p.id]||0)>0){ const b=PET_COMBATE[p.tier]; if(b){ d+=b.dano; v+=b.vida; } } }); return {d,v}; }
-  const temPet = id => (pets[id]||0) > 0;
+  function petBonus(){ let d=0,v=0; PETS.forEach(p=>{ const g=(petsDourados[p.id]||0)>0; if(g||(pets[p.id]||0)>0){ const b=PET_COMBATE[p.tier]; if(b){ const m=g?1.8:1; d+=b.dano*m; v+=b.vida*m; } } }); return {d:Math.round(d),v:Math.round(v)}; }
+  const temPet = id => (pets[id]||0) > 0 || (petsDourados[id]||0) > 0;
   // 🔫 nível da arma (evolução): true = nível 1 (saves antigos)
   function nvArma(id){ const v=armasCompradas[id]; return v===true?1:(v||0); }
   function habNv(id){ return hab[id]||0; }
@@ -2101,7 +2175,7 @@ renderCartas(); renderPets(); renderTudo();
   function salvarJogo(){
     try{
       localStorage.setItem('dopa_v1', JSON.stringify({
-        pontos, brilho, nivel, xp, risco, pets, cartas,
+        pontos, brilho, nivel, xp, risco, pets, petsDourados, cartas,
         estrelas, conquistas, contadores, missoes, modoChato,
         bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda, campanhaProg }
       }));
@@ -2117,6 +2191,7 @@ renderCartas(); renderPets(); renderTudo();
       if(Number.isFinite(d.xp))     xp=d.xp;
       if(Number.isFinite(d.risco))  risco=d.risco;
       if(d.pets && typeof d.pets==='object') pets=d.pets;
+      if(d.petsDourados && typeof d.petsDourados==='object') petsDourados=d.petsDourados;
       if(Array.isArray(d.cartas)) cartas=d.cartas;
       if(Number.isFinite(d.estrelas)) estrelas=d.estrelas;
       if(d.conquistas && typeof d.conquistas==='object') conquistas=d.conquistas;
