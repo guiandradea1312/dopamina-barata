@@ -387,6 +387,9 @@
   .conq { display: flex; align-items: center; gap: 8px; background: #15151d; border: 1px solid #333; border-radius: 10px; padding: 8px; width: calc(50% - 4px); }
   .conq.bloq { opacity: .5; filter: grayscale(1); }
   .conq .ce { font-size: 26px; } .conq .cn { font-weight: bold; font-size: 12px; } .conq .cd { font-size: 10px; color: #aaa; }
+  .statsGrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .statCard { background: #15151d; border: 1px solid #333; border-radius: 10px; padding: 8px; width: calc(50% - 4px); }
+  .statCard .sv { font-weight: bold; font-size: 18px; color: #ffe27a; } .statCard .sl { font-size: 11px; color: #9ab; }
   #eventoBanner { position: fixed; top: -70px; left: 50%; transform: translateX(-50%); z-index: 1400;
     background: linear-gradient(90deg,#ff5252,#ffd93d,#00e676); color: #111; font-weight: bold; font-size: 16px;
     padding: 10px 22px; border-radius: 0 0 14px 14px; box-shadow: 0 4px 20px #000a; transition: top .4s; white-space: nowrap; max-width: 94vw; text-align: center; }
@@ -568,6 +571,25 @@
         <div class="extraTitulo" id="extraConqTitulo">🏅 Conquistas</div>
         <div id="extraConquistas" class="conqGrid"></div>
       </div>
+      <div class="extraBloco">
+        <div class="extraTitulo">📊 Estatísticas</div>
+        <div id="extraStats" class="statsGrid"></div>
+      </div>
+      <div class="extraBloco">
+        <div class="extraTitulo">😈 Modo Chato</div>
+        <div style="font-size:12px;color:#bbb;margin-bottom:8px">Pra quem quer sofrer: a tela escurece <b>bem mais rápido</b> e os anúncios aparecem sem parar.</div>
+        <button class="btn btn-vermelho2" id="btnModoChato" style="max-width:260px">😈 ativar modo chato</button>
+      </div>
+      <div class="extraBloco">
+        <div class="extraTitulo">⚙️ Save</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:8px">
+          <button class="btn btn-verde" id="btnExportar" style="max-width:170px">💾 Exportar</button>
+          <button class="btn btn-roxo" id="btnImportar" style="max-width:170px">📥 Importar</button>
+          <button class="btn btn-vermelho2" id="btnResetTudo" style="max-width:170px">🗑️ Resetar tudo</button>
+        </div>
+        <textarea id="saveBox" placeholder="cole aqui um save pra importar, ou clique em Exportar" style="width:100%;max-width:520px;min-height:70px;border-radius:10px;background:#0d0d16;color:#cde;border:1px solid #333;padding:8px;font-family:monospace;font-size:11px;resize:vertical"></textarea>
+        <div id="saveMsg" style="font-size:12px;color:#8bc;min-height:16px;margin-top:4px"></div>
+      </div>
     </div>
 
     <!-- ABA: PETS -->
@@ -605,10 +627,18 @@
     <div id="batResumoTela"></div>
     <button class="batBtn jogar" id="btnJogarIdle">▶️ Jogar — Auto (idle)</button>
     <button class="batBtn jogar" id="btnJogarAndar">🏃 Jogar — Andar (WASD / toque)</button>
+    <button class="batBtn jogar" id="btnCampanha">🧟 Campanha</button>
     <button class="batBtn sec" id="btnLoja">🛒 Loja de Armas</button>
     <button class="batBtn sec" id="btnArvore">🌳 Árvore de Habilidade</button>
     <button class="batBtn sec" id="btnSairMenu">✖ Sair do modo batalha</button>
     <div class="batDica">☀️ sóis: rápidos e fracos · 🌙 luas: lentas e resistentes. Sobreviva às ondas!</div>
+  </div>
+
+  <div class="batScreen" id="batCampanha" hidden>
+    <div class="batTitulo" style="font-size:24px">🧟 Campanha</div>
+    <div class="batDica">Fases com objetivo fixo. Vença uma pra liberar a próxima.</div>
+    <div class="batLista" id="batCampanhaLista"></div>
+    <button class="batBtn sec" data-volta>⬅ voltar</button>
   </div>
 
   <div class="batScreen" id="batLoja" hidden>
@@ -647,7 +677,7 @@
       <button class="batBtn sec" id="btnQuitArena">⬅ menu</button>
     </div>
     <div id="batFim" hidden>
-      <div class="batTitulo">☠️ FIM</div>
+      <div class="batTitulo" id="batFimTitulo">☠️ FIM</div>
       <div class="r" id="batFimResumo"></div>
       <button class="batBtn jogar" id="btnDeNovo">🔁 de novo</button>
       <button class="batBtn sec" id="btnFimMenu">⬅ menu</button>
@@ -660,6 +690,7 @@
 let pontos = 0, brilho = 50, nivel = 1;
 // Leva 3: prestígio, conquistas, missões, eventos
 let estrelas = 0, conquistas = {}, contadores = { cliques:0, giros:0, ovos:0 }, missoes = null, eventoAtivo = null;
+let modoChato = false;   // Leva 5: UI ainda mais insuportável
 let streak = 0, streakTimer = null, comboMult = 1;
 let somLigado = true;
 let risco = 0, xp = 0;
@@ -730,7 +761,7 @@ function tocar(nome, vol=0.7){
 // ================= HELPERS DE CARTA =================
 function multMod(chave, base){ return cartas.reduce((a,c)=> a * (c.mods[chave] ?? 1), base); }
 function fatorEscurecimento(){ return multMod('escurec', 2.2); }
-function fatorDecaimento(){ return multMod('decai', 0.4); }
+function fatorDecaimento(){ return multMod('decai', 0.4) * (modoChato ? 2.2 : 1); }
 function multPremio(){ return multMod('premio', 1); }
 function bonusPorClique(){ return cartas.reduce((a,c)=> a + (c.mods.clique||0), 0); }
 
@@ -797,12 +828,14 @@ function ganharXP(n){
     alvo = xpAlvo(nivel);
   }
 }
+// cartas: a cada 5 níveis até o 30, depois de 10 em 10
+function ganhaCartaNivel(n){ return n <= 30 ? (n % 5 === 0) : (n % 10 === 0); }
 function recompensaNivel(){
   tocar('yippee');
   const rec = nivel*4;          // pontos bônus escalam com o nível
   addPontos(rec);
   brilho += 4;
-  if(nivel % 5 === 0){ darCarta('rara'); festa("NÍVEL "+nivel+"! 🌈 carta rara!"); }
+  if(ganhaCartaNivel(nivel)){ darCarta('rara'); festa("NÍVEL "+nivel+"! 🌈 carta rara!"); }
   else festa("NÍVEL "+nivel+"! +"+rec+" pts");
 }
 
@@ -1243,7 +1276,7 @@ const ANUNCIOS = [
 ];
 function mostrarAnuncio(){
   if(document.getElementById('batalhaTela').classList.contains('on')) return;   // não durante a batalha
-  if(document.querySelectorAll('.anuncio').length >= 2) return;                  // no máx 2 na tela
+  if(document.querySelectorAll('.anuncio').length >= (modoChato?4:2)) return;    // no máx na tela
   const a = ANUNCIOS[Math.random()*ANUNCIOS.length|0];
   const el = document.createElement('div'); el.className='anuncio';
   el.style.left = (4 + Math.random()*52) + 'vw';
@@ -1267,6 +1300,7 @@ function mostrarAnuncio(){
 }
 setTimeout(mostrarAnuncio, 6000);
 setInterval(()=>{ if(Math.random()<0.85) mostrarAnuncio(); }, 9000);   // frequentes
+setInterval(()=>{ if(modoChato && Math.random()<0.75) mostrarAnuncio(); }, 4200);   // 😈 modo chato: mais ainda
 
 // ================= 🏆 LEVA 3 =================
 const salvar = ()=>{ if(window.salvarJogo) window.salvarJogo(); };
@@ -1277,10 +1311,13 @@ function estrelasSePrestigiar(){ return Math.floor(nivel/5); }
 function prestigiar(){
   if(estrelasSePrestigiar() <= 0) return;
   estrelas += estrelasSePrestigiar();
+  // zera TUDO menos pets e conquistas
   pontos=0; nivel=1; xp=0; risco=0; brilho=50;
+  cartas=[];
+  if(window.resetarBatalha) window.resetarBatalha();
   festa('⭐ RENASCEU! '+estrelas+' estrelas');
   if(typeof tocar==='function') tocar('fah');
-  renderExtra(); renderTudo(); salvar();
+  renderExtra(); renderTudo(); renderCartas(); salvar();
 }
 
 // --- 🎯 Missões diárias ---
@@ -1347,7 +1384,7 @@ function renderExtra(){
   const g=estrelasSePrestigiar();
   $("extraPrestigio").innerHTML =
     `⭐ Estrelas: <b>${estrelas}</b> · bônus de pontos: <b>+${Math.round(estrelas*15)}%</b>
-     <div style="font-size:12px;color:#bbb;margin:6px 0">Renascer zera pontos/nível/brilho, mas dá estrelas permanentes (ganha <b>${g}</b> agora).</div>`;
+     <div style="font-size:12px;color:#bbb;margin:6px 0">Renascer zera <b>tudo</b> (pontos, nível, brilho, cartas, armas e herói) — só <b>pets</b> e <b>conquistas</b> ficam. Em troca, ganha <b>${g}</b> estrela(s) permanente(s).</div>`;
   const btn=$("btnRenascer"); btn.disabled=g<=0; btn.textContent=g>0?`⭐ RENASCER (+${g})`:'⭐ precisa nível 5';
   checarMissoesDia();
   $("extraMissoes").innerHTML = missoes.lista.map(m=>{
@@ -1360,7 +1397,57 @@ function renderExtra(){
     const ok=conquistas[c.id];
     return `<div class="conq ${ok?'ok':'bloq'}"><div class="ce">${ok?c.emoji:'🔒'}</div><div style="text-align:left"><div class="cn">${c.nome}</div><div class="cd">${c.desc}</div></div></div>`;
   }).join('');
+  renderStats();
 }
+function renderStats(){
+  const box=$("extraStats"); if(!box) return;
+  const petsTem = PETS.filter(p=>(pets[p.id]||0)>0).length;
+  const recOnda = window.getRecordeOnda ? window.getRecordeOnda() : 0;
+  const stats = [
+    ['⭐ Nível',        nivel],
+    ['💰 Pontos',       Math.floor(pontos)],
+    ['🌟 Estrelas',     estrelas],
+    ['👆 Cliques',      contadores.cliques||0],
+    ['🎡 Giros',        contadores.giros||0],
+    ['🥚 Ovos',         contadores.ovos||0],
+    ['🐾 Pets',         petsTem+'/'+PETS.length],
+    ['🏆 Recorde onda', recOnda],
+  ];
+  box.innerHTML = stats.map(([l,v])=>`<div class="statCard"><div class="sv">${v}</div><div class="sl">${l}</div></div>`).join('');
+}
+// ============ 😈 MODO CHATO ============
+function renderModoChato(){ const b=$("btnModoChato"); if(b) b.textContent = modoChato ? '😇 desativar modo chato' : '😈 ativar modo chato'; }
+$("btnModoChato").addEventListener("click", ()=>{
+  modoChato=!modoChato; renderModoChato();
+  popup(window.innerWidth/2, window.innerHeight/2, modoChato?'😈 MODO CHATO ON':'😇 modo chato off', modoChato?'#ff5252':'#7CFC7C');
+  if(modoChato && typeof tocar==='function') tocar('boom');
+  salvar();
+});
+renderModoChato();
+// ============ 💾 EXPORTAR / IMPORTAR / RESETAR SAVE ============
+function saveInfo(msg,cor){ const m=$("saveMsg"); if(m){ m.textContent=msg; m.style.color=cor||'#8bc'; } }
+$("btnExportar").addEventListener("click", ()=>{
+  if(window.salvarJogo) window.salvarJogo();
+  const raw = localStorage.getItem('dopa_v1') || '';
+  const box=$("saveBox"); box.value=raw; box.select();
+  let copiado=false;
+  try{ if(navigator.clipboard){ navigator.clipboard.writeText(raw); copiado=true; } }catch(e){}
+  saveInfo(copiado?'✅ save copiado! guarde esse texto.':'✅ save gerado — copie o texto acima (Ctrl+C).','#7CFC7C');
+});
+$("btnImportar").addEventListener("click", ()=>{
+  const txt=($("saveBox").value||'').trim();
+  if(!txt){ saveInfo('cole um save na caixa primeiro.','#ff8a8a'); return; }
+  let d; try{ d=JSON.parse(txt); }catch(e){ saveInfo('❌ texto inválido, não é um save.','#ff8a8a'); return; }
+  if(!d || typeof d!=='object'){ saveInfo('❌ save inválido.','#ff8a8a'); return; }
+  localStorage.setItem('dopa_v1', JSON.stringify(d));
+  saveInfo('✅ save importado! recarregando…','#7CFC7C');
+  setTimeout(()=>location.reload(), 700);
+});
+$("btnResetTudo").addEventListener("click", ()=>{
+  if(!confirm('Apagar TUDO e começar do zero? Isso não tem volta.')) return;
+  localStorage.removeItem('dopa_v1');
+  setTimeout(()=>location.reload(), 200);
+});
 
 // ================= MUTE =================
 $("btnMute").addEventListener("click", ()=>{ somLigado=!somLigado; $("btnMute").textContent=somLigado?"🔊 som":"🔇 mudo"; });
@@ -1501,6 +1588,17 @@ renderCartas(); renderPets(); renderTudo();
     };
   }
 
+  // 🧟 campanha (Leva 5)
+  const CAMPANHA = [
+    { nome:'Fase 1 — Aquecimento', alvo:3,  premio:300,  carta:false },
+    { nome:'Fase 2 — Esquenta',    alvo:5,  premio:600,  carta:true  },
+    { nome:'Fase 3 — Chefão',      alvo:8,  premio:1000, carta:false },
+    { nome:'Fase 4 — Pressão',     alvo:12, premio:1800, carta:true  },
+    { nome:'Fase 5 — Apocalipse',  alvo:15, premio:3000, carta:true  },
+  ];
+  let campanhaProg = 0;         // quantas fases já venceu
+  let campanhaAtiva = false, campanhaIdx = 0;
+
   // estado da partida
   let canvas, ctx, W, H;
   let jogando=false, pausado=false, modo='idle';
@@ -1517,7 +1615,7 @@ renderCartas(); renderPets(); renderTudo();
   let explosoes=[], raiosVisuais=[], inimProjs=[];
   let chuvaResta=0, chuvaT=0, chuvaInt=0, chuvaRaio=0, chuvaDano=0;
 
-  function tela(id){ ['batMenu','batLoja','batArvore','batArena'].forEach(s=> $b(s).hidden = (s!==id)); }
+  function tela(id){ ['batMenu','batCampanha','batLoja','batArvore','batArena'].forEach(s=> $b(s).hidden = (s!==id)); }
   window.abrirBatalha = function(){ $b('batalhaTela').classList.add('on'); pararJogo(); tela('batMenu'); renderResumo(); };
   function fecharBatalha(){ pararJogo(); $b('batalhaTela').classList.remove('on'); if(typeof renderTudo==='function') renderTudo(); }
 
@@ -1593,7 +1691,44 @@ renderCartas(); renderPets(); renderTudo();
     W = canvas.width = Math.max(1, w);
     H = canvas.height = Math.max(1, h);
   }
+  // 🧟 CAMPANHA
+  function renderCampanha(){
+    const box=$b('batCampanhaLista'); box.innerHTML='';
+    CAMPANHA.forEach((f,i)=>{
+      const liberada = i <= campanhaProg;   // libera a próxima ao vencer a anterior
+      const vencida  = i < campanhaProg;
+      const b=document.createElement('button');
+      b.className = 'batBtn ' + (liberada?'jogar':'sec');
+      b.disabled = !liberada;
+      b.innerHTML = `${vencida?'✅':(liberada?'▶️':'🔒')} ${f.nome} — sobreviva a ${f.alvo} ondas · 💰${f.premio}${f.carta?' 🌈':''}`;
+      if(liberada) b.onclick=()=>iniciarCampanha(i);
+      box.appendChild(b);
+    });
+  }
+  function iniciarCampanha(idx){
+    campanhaIdx=idx;
+    iniciarBatalha('andar');
+    campanhaAtiva=true;
+    toast('🧟 '+CAMPANHA[idx].nome+' — aguente '+CAMPANHA[idx].alvo+' ondas!');
+  }
+  function vencerCampanha(){
+    jogando=false;
+    const f=CAMPANHA[campanhaIdx];
+    if(campanhaProg < campanhaIdx+1) campanhaProg = campanhaIdx+1;
+    if(typeof addPontos==='function'){ addPontos(f.premio); ptsGanhos += f.premio; }
+    if(f.carta && typeof darCarta==='function') darCarta('rara');
+    ganharXPheroi(150 + campanhaIdx*80);
+    if(typeof tocar==='function') tocar('fah');
+    salvarJogo();
+    campanhaAtiva=false;
+    const ultima = campanhaIdx >= CAMPANHA.length-1;
+    $b('batFimTitulo').textContent = '🏆 FASE VENCIDA!';
+    $b('batFimResumo').innerHTML = `<b>${f.nome}</b> concluída!<br>💰 +${f.premio} pontos${f.carta?'<br>🌈 carta rara!':''}${ultima?'<br>👑 você zerou a campanha!':''}`;
+    $b('batFim').hidden=false;
+  }
+
   function iniciarBatalha(m){
+    campanhaAtiva=false;
     modo=m; tela('batArena'); $b('batPause').hidden=true; $b('batFim').hidden=true; $b('batUpgrades').hidden=true;
     runBuffs = { ...RUN_ZERO };
     setupCanvas();
@@ -1609,6 +1744,7 @@ renderCartas(); renderPets(); renderTudo();
   }
   function proximaOnda(){
     onda++;
+    if(campanhaAtiva && onda > CAMPANHA[campanhaIdx].alvo){ vencerCampanha(); return; }
     filaSpawn=[];
     if(onda % 5 === 0){                       // 👹 onda de chefão
       filaSpawn.push('boss');
@@ -1915,7 +2051,8 @@ renderCartas(); renderPets(); renderTudo();
   }
 
   function fim(){
-    jogando=false; $b('batUpgrades').hidden=true; $b('batFim').hidden=false;
+    jogando=false; campanhaAtiva=false; $b('batUpgrades').hidden=true; $b('batFim').hidden=false;
+    $b('batFimTitulo').textContent='☠️ FIM';
     const novoRecorde = onda>recordeOnda; if(novoRecorde) recordeOnda=onda;
     $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
     if(typeof tocar==='function')tocar('boom'); if(typeof salvarJogo==='function')salvarJogo(); if(typeof renderTudo==='function')renderTudo();
@@ -1934,6 +2071,7 @@ renderCartas(); renderPets(); renderTudo();
   $b('btnSairMenu').onclick=fecharBatalha;
   $b('btnJogarIdle').onclick=()=>iniciarBatalha('idle');
   $b('btnJogarAndar').onclick=()=>iniciarBatalha('andar');
+  $b('btnCampanha').onclick=()=>{ tela('batCampanha'); renderCampanha(); };
   $b('btnLoja').onclick=()=>{ tela('batLoja'); renderLoja(); };
   $b('btnArvore').onclick=()=>{ arvoreDeBatalha=false; tela('batArvore'); renderArvore(); };
   $b('batArvBtn').onclick=()=>{ if(jogando){ pausado=true; arvoreDeBatalha=true; tela('batArvore'); renderArvore(); } };
@@ -1964,8 +2102,8 @@ renderCartas(); renderPets(); renderTudo();
     try{
       localStorage.setItem('dopa_v1', JSON.stringify({
         pontos, brilho, nivel, xp, risco, pets, cartas,
-        estrelas, conquistas, contadores, missoes,
-        bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda }
+        estrelas, conquistas, contadores, missoes, modoChato,
+        bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda, campanhaProg }
       }));
     }catch(e){}
   }
@@ -1984,6 +2122,7 @@ renderCartas(); renderPets(); renderTudo();
       if(d.conquistas && typeof d.conquistas==='object') conquistas=d.conquistas;
       if(d.contadores && typeof d.contadores==='object') contadores=Object.assign({cliques:0,giros:0,ovos:0}, d.contadores);
       if(d.missoes && typeof d.missoes==='object') missoes=d.missoes;
+      if(typeof d.modoChato==='boolean'){ modoChato=d.modoChato; if(typeof renderModoChato==='function') renderModoChato(); }
       if(d.bat){ const b=d.bat;
         if(b.armasCompradas) armasCompradas=b.armasCompradas;
         if(b.armaEquipada)   armaEquipada=b.armaEquipada;
@@ -1992,6 +2131,7 @@ renderCartas(); renderPets(); renderTudo();
         if(Number.isFinite(b.heroiXP))    heroiXP=b.heroiXP;
         if(Number.isFinite(b.pontosHab))  pontosHab=b.pontosHab;
         if(Number.isFinite(b.recordeOnda)) recordeOnda=b.recordeOnda;
+        if(Number.isFinite(b.campanhaProg)) campanhaProg=b.campanhaProg;
       }
       if(typeof renderTudo==='function') renderTudo();
       if(typeof renderPets==='function') renderPets();
@@ -2000,6 +2140,12 @@ renderCartas(); renderPets(); renderTudo();
   }
   window.salvarJogo = salvarJogo;
   window.getRecordeOnda = ()=>recordeOnda;
+  // zera armas e herói (usado no prestígio) — mantém só o recorde de onda
+  window.resetarBatalha = ()=>{
+    armasCompradas = { basica:true }; armaEquipada = 'basica';
+    hab = {}; heroiNivel = 1; heroiXP = 0; pontosHab = 0;
+    salvarJogo();
+  };
   carregarJogo();
   setInterval(salvarJogo, 4000);
   window.addEventListener('beforeunload', salvarJogo);
