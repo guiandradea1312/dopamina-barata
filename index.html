@@ -314,8 +314,12 @@
   #batHud .hpbar > i { display: block; height: 100%; background: linear-gradient(90deg,#ff3b3b,#ff9b9b); width: 100%; transition: width .1s; }
   #batHud .tag { background: rgba(0,0,0,.55); border-radius: 8px; padding: 4px 8px; }
   #batHud .tag b { color: #ffd93d; }
-  #batPause, #batFim { position: absolute; inset: 0; background: rgba(0,0,0,.75); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 6; text-align: center; }
-  #batPause[hidden], #batFim[hidden] { display: none; }
+  #batPause, #batFim, #batUpgrades { position: absolute; inset: 0; background: rgba(0,0,0,.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; z-index: 6; text-align: center; padding: 16px; }
+  #batPause[hidden], #batFim[hidden], #batUpgrades[hidden] { display: none; }
+  #batUpgLista { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .upgCard { width: 150px; background: linear-gradient(#1c1030,#140a24); border: 2px solid #6a2ea0; border-radius: 14px; padding: 16px 12px; cursor: pointer; color: #fff; font-family: inherit; transition: transform .1s, box-shadow .1s; }
+  .upgCard:hover { transform: translateY(-4px); box-shadow: 0 0 18px #a24bff; border-color: #ffd93d; }
+  .upgCard .ue { font-size: 38px; } .upgCard .un { font-weight: bold; font-size: 15px; margin: 4px 0; color: #ffd93d; } .upgCard .ud { font-size: 12px; color: #ccc; }
   #batFim .r { font-size: 14px; color: #ddd; line-height: 1.9; }
   .batDica { font-size: 12px; color: #888; max-width: 340px; text-align: center; }
 
@@ -561,6 +565,10 @@
       <span class="tag">Nv <b id="batNivel">1</b> · XP <b id="batXp">0/0</b></span>
       <span class="tag">💀 <b id="batKills">0</b></span>
       <span class="tag">💰 <b id="batPts">0</b></span>
+    </div>
+    <div id="batUpgrades" hidden>
+      <div class="batTitulo" id="batUpgTitulo" style="font-size:22px">escolha uma melhoria</div>
+      <div id="batUpgLista"></div>
     </div>
     <div id="batPause" hidden>
       <div class="batTitulo" style="font-size:24px">⏸ Pausado</div>
@@ -1221,28 +1229,45 @@ renderCartas(); renderPets(); renderTudo();
 
   // progressão (persiste entre partidas na sessão)
   let armasCompradas = { basica:true }, armaEquipada = 'basica';
-  let hab = {}, heroiNivel = 1, heroiXP = 0, pontosHab = 0;
+  let hab = {}, heroiNivel = 1, heroiXP = 0, pontosHab = 0, recordeOnda = 0;
+
+  // 💎 upgrades escolhidos durante a run (resetam a cada partida)
+  const RUN_ZERO = { dano:0, cad:0, vidaBonus:0, proj:0, crit:0, vampiro:0, vel:0, alcance:0, reducao:0, regen:0, area:0 };
+  let runBuffs = { ...RUN_ZERO };
+  const UPGRADES = [
+    { emoji:'💥', nome:'Dano+',     desc:'+25% de dano',        ap:()=>runBuffs.dano+=0.25 },
+    { emoji:'⚡', nome:'Cadência+', desc:'+25% de cadência',    ap:()=>runBuffs.cad+=0.25 },
+    { emoji:'❤️', nome:'Vida+',     desc:'+40 vida máx (cura)', ap:()=>runBuffs.vidaBonus+=40 },
+    { emoji:'✨', nome:'Projétil+', desc:'+1 projétil',         ap:()=>runBuffs.proj+=1 },
+    { emoji:'🎯', nome:'Crítico+',  desc:'+8% de crítico',      ap:()=>runBuffs.crit+=0.08 },
+    { emoji:'🧛', nome:'Vampiro+',  desc:'+3 vida ao matar',    ap:()=>runBuffs.vampiro+=3 },
+    { emoji:'👟', nome:'Veloz+',    desc:'+15% de velocidade',  ap:()=>runBuffs.vel+=0.15 },
+    { emoji:'📡', nome:'Alcance+',  desc:'+20% de alcance',     ap:()=>runBuffs.alcance+=0.20 },
+    { emoji:'🛡️', nome:'Armadura+', desc:'-8% de dano recebido',ap:()=>runBuffs.reducao+=0.08 },
+    { emoji:'💣', nome:'Área+',     desc:'+40 de raio de área', ap:()=>runBuffs.area+=40 },
+    { emoji:'🩹', nome:'Regen+',    desc:'+1 vida por segundo', ap:()=>runBuffs.regen+=1 },
+  ];
 
   const $b = id => document.getElementById(id);
   function petBonus(){ let d=0,v=0; PETS.forEach(p=>{ if((pets[p.id]||0)>0){ const b=PET_COMBATE[p.tier]; if(b){ d+=b.dano; v+=b.vida; } } }); return {d,v}; }
   function habNv(id){ return hab[id]||0; }
   function xpNec(n){ return Math.round(50*Math.pow(n,1.5)); }
   function stats(){
-    const arma = ARMAS.find(a=>a.id===armaEquipada) || ARMAS[0], pb = petBonus();
+    const arma = ARMAS.find(a=>a.id===armaEquipada) || ARMAS[0], pb = petBonus(), r = runBuffs;
     return {
       arma,
-      vidaMax: 200 + habNv('de1')*25 + habNv('de4')*80 + pb.v,
-      dano: (arma.dano + pb.d) * (1 + habNv('of1')*0.15),
-      cadencia: arma.cadencia * (1 + habNv('of2')*0.10),
-      crit: habNv('of3')*0.05,
-      tiros: (arma.tiros||1) + habNv('of4'),
-      regen: habNv('de2'),
-      reducao: Math.min(0.6, habNv('de3')*0.08),
-      vel: 3.4 * (1 + habNv('ut1')*0.08),
-      alcance: arma.alcance * (1 + habNv('ut2')*0.12),
-      vampiro: habNv('ut3')*2,
+      vidaMax: 200 + habNv('de1')*25 + habNv('de4')*80 + pb.v + r.vidaBonus,
+      dano: (arma.dano + pb.d) * (1 + habNv('of1')*0.15 + r.dano),
+      cadencia: arma.cadencia * (1 + habNv('of2')*0.10 + r.cad),
+      crit: habNv('of3')*0.05 + r.crit,
+      tiros: (arma.tiros||1) + habNv('of4') + r.proj,
+      regen: habNv('de2') + r.regen,
+      reducao: Math.min(0.7, habNv('de3')*0.08 + r.reducao),
+      vel: 3.4 * (1 + habNv('ut1')*0.08 + r.vel),
+      alcance: arma.alcance * (1 + habNv('ut2')*0.12 + r.alcance),
+      vampiro: habNv('ut3')*2 + r.vampiro,
       rewardMult: 1 + habNv('ut4')*0.20,
-      projVel: arma.projVel, area: arma.area||0, lentidao: arma.lentidao||0,
+      projVel: arma.projVel, area: (arma.area||0) + r.area, lentidao: arma.lentidao||0,
     };
   }
 
@@ -1256,6 +1281,8 @@ renderCartas(); renderPets(); renderTudo();
   let toastTxt='', toastT=0;
   // especiais
   let velocidadeJogo=1, arvoreDeBatalha=false;
+  let shakeT=0, shakeMag=0;
+  function tremer(mag){ shakeT=0.22; shakeMag=mag; }
   let especialCD=0, frenzyT=0, frenzyCad=1, frenzyDano=1;
   let explosoes=[], raiosVisuais=[], inimProjs=[];
   let chuvaResta=0, chuvaT=0, chuvaInt=0, chuvaRaio=0, chuvaDano=0;
@@ -1273,7 +1300,8 @@ renderCartas(); renderPets(); renderTudo();
        ⚡ Especial: <b style="color:#ffd93d">${s.arma.especial ? s.arma.especial.nome : '—'}</b> <span style="color:#888">(Espaço/⚡)</span><br>
        🐾 Bônus dos pets: <b>+${pb.d} dano · +${pb.v} vida</b><br>
        🎖️ Herói nível <b>${heroiNivel}</b> · XP ${Math.floor(heroiXP)}/${xpNec(heroiNivel)}<br>
-       🌳 Pontos de habilidade: <b>${pontosHab}</b>`;
+       🌳 Pontos de habilidade: <b>${pontosHab}</b><br>
+       🏆 Recorde: <b>onda ${recordeOnda}</b>`;
   }
 
   function renderLoja(){
@@ -1327,12 +1355,13 @@ renderCartas(); renderPets(); renderTudo();
     H = canvas.height = Math.max(1, h);
   }
   function iniciarBatalha(m){
-    modo=m; tela('batArena'); $b('batPause').hidden=true; $b('batFim').hidden=true;
+    modo=m; tela('batArena'); $b('batPause').hidden=true; $b('batFim').hidden=true; $b('batUpgrades').hidden=true;
+    runBuffs = { ...RUN_ZERO };
     setupCanvas();
     curStats=stats();
     player={ x:W/2, y:H/2, r:18, hp:curStats.vidaMax, hpMax:curStats.vidaMax };
     enemies=[]; projs=[]; fluts=[]; parts=[]; teclas={}; touchAlvo=null;
-    explosoes=[]; raiosVisuais=[]; inimProjs=[]; chuvaResta=0; frenzyT=0; especialCD=3;
+    explosoes=[]; raiosVisuais=[]; inimProjs=[]; chuvaResta=0; frenzyT=0; especialCD=3; shakeT=0;
     onda=0; killCount=0; ptsGanhos=0; atkT=0; emBreak=false; graceT=1.5;
     proximaOnda();
     jogando=true; pausado=false; ultimoT=performance.now();
@@ -1401,7 +1430,7 @@ renderCartas(); renderPets(); renderTudo();
     if(Math.random()<curStats.crit){ d*=2; crit=true; }
     e.vida-=d;
     if(lentidao){ e.slowT=1.2; e.slowFator=lentidao; }
-    fluts.push({ x:e.x, y:e.y-e.r, txt:Math.round(d)+(crit?'!':''), cor:crit?'#ffd93d':'#fff', vida:0.7, vy:-0.6 });
+    fluts.push({ x:e.x, y:e.y-e.r, txt:Math.round(d)+(crit?'!':''), cor:crit?'#ffd93d':'#fff', vida:crit?0.9:0.7, vy:-0.6, crit });
   }
   function explosaoArea(x,y,raio,dano){
     for(const e of enemies){ if(Math.hypot(e.x-x,e.y-y)<=raio) danoEm(e,dano); }
@@ -1423,7 +1452,7 @@ renderCartas(); renderPets(); renderTudo();
     } else if(esp.tipo==='chuva'){
       chuvaResta=esp.n; chuvaInt=esp.dur/esp.n; chuvaT=0; chuvaRaio=esp.raio; chuvaDano=s.dano*esp.danoMult;
     } else if(esp.tipo==='nova'){
-      explosaoArea(player.x,player.y,esp.raio,s.dano*esp.danoMult);
+      explosaoArea(player.x,player.y,esp.raio,s.dano*esp.danoMult); tremer(12);
     } else if(esp.tipo==='congelar'){
       enemies.forEach(e=>{ if(!e.boss){ e.slowT=esp.dur; e.slowFator=1; } else { e.slowT=esp.dur; e.slowFator=0.7; } danoEm(e,s.dano*esp.danoMult); });
       explosoes.push({ x:player.x, y:player.y, raio:Math.max(W,H), vida:0.4, cor:'#8bd6ff' });
@@ -1504,7 +1533,7 @@ renderCartas(); renderPets(); renderTudo();
         if(typeof addPontos==='function') addPontos(pts);
         ganharXPheroi(xpg);
         if(s.vampiro) player.hp=Math.min(player.hpMax,player.hp+s.vampiro);
-        if(e.boss) toast('👹 CHEFÃO DERROTADO!');
+        if(e.boss){ toast('👹 CHEFÃO DERROTADO!'); tremer(18); }
         for(let k=0;k<(e.boss?18:6);k++) parts.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, vida:0.6, cor:e.boss?'#ff5252':(e.emoji==='☀️'?'#ffd93d':'#9db4ff') });
         enemies.splice(i,1);
       }
@@ -1512,7 +1541,7 @@ renderCartas(); renderPets(); renderTudo();
 
     for(let i=inimProjs.length-1;i>=0;i--){ const p=inimProjs[i]; p.x+=p.vx*F; p.y+=p.vy*F; p.vida-=dt;
       const dx=p.x-player.x,dy=p.y-player.y, bateu = dx*dx+dy*dy < (player.r+6)*(player.r+6);
-      if(bateu && graceT<=0) player.hp-=p.dano*(1-s.reducao);
+      if(bateu && graceT<=0){ player.hp-=p.dano*(1-s.reducao); tremer(6); }
       if(bateu||p.vida<=0||p.x<-20||p.x>W+20||p.y<-20||p.y>H+20) inimProjs.splice(i,1);
     }
     for(let i=explosoes.length-1;i>=0;i--){ explosoes[i].vida-=dt; if(explosoes[i].vida<=0) explosoes.splice(i,1); }
@@ -1520,12 +1549,36 @@ renderCartas(); renderPets(); renderTudo();
     for(let i=fluts.length-1;i>=0;i--){ const f=fluts[i]; f.y+=f.vy*F; f.vida-=dt; if(f.vida<=0)fluts.splice(i,1); }
     for(let i=parts.length-1;i>=0;i--){ const p=parts[i]; p.x+=p.vx*F; p.y+=p.vy*F; p.vida-=dt; if(p.vida<=0)parts.splice(i,1); }
     if(toastT>0) toastT-=dt;
+    if(shakeT>0) shakeT-=dt;
 
-    if(filaSpawn.length===0 && enemies.length===0 && !emBreak){ emBreak=true; breakT=1.6; }
-    if(emBreak){ breakT-=dt; if(breakT<=0){ emBreak=false; proximaOnda(); } }
+    // onda limpa → escolher upgrade (💎), depois próxima onda
+    if(filaSpawn.length===0 && enemies.length===0 && !emBreak){ emBreak=true; abrirUpgrades(); }
 
     if(player.hp<=0){ fim(); return; }
     atualizaHud();
+  }
+
+  function abrirUpgrades(){
+    pausado=true;
+    const escolhas=[...UPGRADES].sort(()=>Math.random()-0.5).slice(0,3);
+    const box=$b('batUpgLista'); box.innerHTML='';
+    escolhas.forEach(u=>{
+      const b=document.createElement('button'); b.className='upgCard';
+      b.innerHTML=`<div class="ue">${u.emoji}</div><div class="un">${u.nome}</div><div class="ud">${u.desc}</div>`;
+      b.onclick=()=>{
+        u.ap();
+        const antes=player.hpMax;
+        curStats=stats();
+        player.hpMax=curStats.vidaMax;
+        player.hp=Math.min(player.hpMax, player.hp + Math.max(0, player.hpMax-antes)); // cura o ganho de vida
+        $b('batUpgrades').hidden=true;
+        emBreak=false; proximaOnda();
+        pausado=false; ultimoT=performance.now();
+      };
+      box.appendChild(b);
+    });
+    $b('batUpgTitulo').textContent = 'ONDA '+(onda+1)+' — escolha uma melhoria';
+    $b('batUpgrades').hidden=false;
   }
 
   function ganharXPheroi(n){
@@ -1547,7 +1600,9 @@ renderCartas(); renderPets(); renderTudo();
   }
 
   function draw(){
+    ctx.setTransform(1,0,0,1,0,0);
     ctx.clearRect(0,0,W,H);
+    if(shakeT>0){ const m=shakeMag*(shakeT/0.22); ctx.setTransform(1,0,0,1,(Math.random()-0.5)*m,(Math.random()-0.5)*m); }
     // grade de fundo (deixa claro que a arena está renderizando)
     ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
     for(let gx=0; gx<W; gx+=60){ ctx.beginPath(); ctx.moveTo(gx,0); ctx.lineTo(gx,H); ctx.stroke(); }
@@ -1578,16 +1633,17 @@ renderCartas(); renderPets(); renderTudo();
     ctx.font='32px serif'; ctx.fillText('🦸',player.x,player.y);
     ctx.strokeStyle='#6ef'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(player.x,player.y,player.r,0,7); ctx.stroke();
     if(graceT>0){ ctx.strokeStyle='#ffd93d'; ctx.lineWidth=3; ctx.globalAlpha=0.5+0.5*Math.sin(performance.now()/90); ctx.beginPath(); ctx.arc(player.x,player.y,player.r+14,0,7); ctx.stroke(); ctx.globalAlpha=1; }
-    ctx.font='bold 15px sans-serif';
-    for(const f of fluts){ ctx.globalAlpha=Math.max(0,f.vida*1.4); ctx.fillStyle=f.cor; ctx.fillText(f.txt,f.x,f.y); }
+    for(const f of fluts){ ctx.globalAlpha=Math.max(0,f.vida*1.4); ctx.fillStyle=f.cor; ctx.font='bold '+(f.crit?24:15)+'px sans-serif'; ctx.fillText(f.txt,f.x,f.y); }
     ctx.globalAlpha=1;
-    if(toastT>0){ ctx.globalAlpha=Math.min(1,toastT*2); ctx.fillStyle='#fff'; ctx.font='bold 32px sans-serif'; ctx.fillText(toastTxt,W/2,66); ctx.globalAlpha=1; }
+    ctx.setTransform(1,0,0,1,0,0);   // toast fixo (não treme)
+    if(toastT>0){ ctx.globalAlpha=Math.min(1,toastT*2); ctx.fillStyle='#fff'; ctx.font='bold 32px sans-serif'; ctx.textAlign='center'; ctx.fillText(toastTxt,W/2,66); ctx.globalAlpha=1; }
   }
 
   function fim(){
-    jogando=false; $b('batFim').hidden=false;
-    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos<br>🎖️ herói nível ${heroiNivel}`;
-    if(typeof tocar==='function')tocar('boom'); if(typeof renderTudo==='function')renderTudo();
+    jogando=false; $b('batUpgrades').hidden=true; $b('batFim').hidden=false;
+    const novoRecorde = onda>recordeOnda; if(novoRecorde) recordeOnda=onda;
+    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
+    if(typeof tocar==='function')tocar('boom'); if(typeof salvarJogo==='function')salvarJogo(); if(typeof renderTudo==='function')renderTudo();
   }
   function pararJogo(){ jogando=false; pausado=false; }
 
@@ -1633,7 +1689,7 @@ renderCartas(); renderPets(); renderTudo();
     try{
       localStorage.setItem('dopa_v1', JSON.stringify({
         pontos, brilho, nivel, xp, risco, pets, cartas,
-        bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab }
+        bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda }
       }));
     }catch(e){}
   }
@@ -1655,6 +1711,7 @@ renderCartas(); renderPets(); renderTudo();
         if(Number.isFinite(b.heroiNivel)) heroiNivel=b.heroiNivel;
         if(Number.isFinite(b.heroiXP))    heroiXP=b.heroiXP;
         if(Number.isFinite(b.pontosHab))  pontosHab=b.pontosHab;
+        if(Number.isFinite(b.recordeOnda)) recordeOnda=b.recordeOnda;
       }
       if(typeof renderTudo==='function') renderTudo();
       if(typeof renderPets==='function') renderPets();
