@@ -376,6 +376,22 @@
   .anuncioBtn { font-family: inherit; font-weight: bold; font-size: 14px; padding: 9px 14px; border: none; border-radius: 10px; background: #16a34a; color: #fff; cursor: pointer; width: 100%; box-shadow: 0 3px 0 #0a5; animation: anuBtn .8s infinite alternate; }
   @keyframes anuBtn { to { filter: brightness(1.2); } }
 
+  /* ===== Extra: prestígio / missões / conquistas ===== */
+  .extraBloco { background: rgba(20,20,28,.8); border: 1px solid #333; border-radius: 14px; padding: 14px; width: 100%; max-width: 460px; text-align: center; }
+  .extraTitulo { font-weight: bold; font-size: 15px; margin-bottom: 8px; }
+  #extraPrestigio { font-size: 13px; }
+  .missao { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 2px; border-bottom: 1px solid #2a2a2a; text-align: left; }
+  .missao.ok { color: #7CFC7C; }
+  .missao .mp { color: #ffd93d; font-weight: bold; }
+  .conqGrid { display: flex; flex-wrap: wrap; gap: 8px; }
+  .conq { display: flex; align-items: center; gap: 8px; background: #15151d; border: 1px solid #333; border-radius: 10px; padding: 8px; width: calc(50% - 4px); }
+  .conq.bloq { opacity: .5; filter: grayscale(1); }
+  .conq .ce { font-size: 26px; } .conq .cn { font-weight: bold; font-size: 12px; } .conq .cd { font-size: 10px; color: #aaa; }
+  #eventoBanner { position: fixed; top: -70px; left: 50%; transform: translateX(-50%); z-index: 1400;
+    background: linear-gradient(90deg,#ff5252,#ffd93d,#00e676); color: #111; font-weight: bold; font-size: 16px;
+    padding: 10px 22px; border-radius: 0 0 14px 14px; box-shadow: 0 4px 20px #000a; transition: top .4s; white-space: nowrap; max-width: 94vw; text-align: center; }
+  #eventoBanner.on { top: 0; }
+
   /* ===== CELULAR ===== */
   @media (max-width: 600px) {
     #hud { gap: 6px; top: 6px; }
@@ -456,6 +472,7 @@
       <button class="abaBtn" data-aba="cartas">🃏 Cartas</button>
       <button class="abaBtn" data-aba="pets">🐾 Pets</button>
       <button class="abaBtn" data-aba="batalha">⚔️ Batalha</button>
+      <button class="abaBtn" data-aba="extra">🏆 Extra</button>
     </div>
 
     <!-- ABA: MÁQUINAS -->
@@ -536,6 +553,23 @@
       <button class="btn btn-vermelho2" id="btnAbrirBatalha" style="max-width:280px">⚔️ ABRIR BATALHA</button>
     </div>
 
+    <!-- ABA: EXTRA (prestígio / missões / conquistas) -->
+    <div class="pane" id="pane-extra" hidden>
+      <div class="extraBloco">
+        <div class="extraTitulo">⭐ Renascer (Prestígio)</div>
+        <div id="extraPrestigio"></div>
+        <button class="btn btn-roxo" id="btnRenascer" style="max-width:260px">⭐ RENASCER</button>
+      </div>
+      <div class="extraBloco">
+        <div class="extraTitulo">🎯 Missões de hoje</div>
+        <div id="extraMissoes"></div>
+      </div>
+      <div class="extraBloco">
+        <div class="extraTitulo" id="extraConqTitulo">🏅 Conquistas</div>
+        <div id="extraConquistas" class="conqGrid"></div>
+      </div>
+    </div>
+
     <!-- ABA: PETS -->
     <div class="pane" id="pane-pets" hidden>
       <button class="btn btn-roxo" id="btnOvo" style="max-width:280px">🥚 abrir ovo (40 pts)</button>
@@ -561,6 +595,7 @@
 </div>
 
 <button class="mute" id="btnMute">🔊 som</button>
+<div id="eventoBanner"></div>
 
 <!-- ================= TELA DE BATALHA ================= -->
 <div id="batalhaTela">
@@ -623,6 +658,8 @@
 <script>
 // ================= ESTADO =================
 let pontos = 0, brilho = 50, nivel = 1;
+// Leva 3: prestígio, conquistas, missões, eventos
+let estrelas = 0, conquistas = {}, contadores = { cliques:0, giros:0, ovos:0 }, missoes = null, eventoAtivo = null;
 let streak = 0, streakTimer = null, comboMult = 1;
 let somLigado = true;
 let risco = 0, xp = 0;
@@ -742,7 +779,10 @@ function venderCarta(idx,tipo){
 }
 
 // ================= RECURSOS =================
-function addPontos(n){ pontos = Math.max(0, pontos+n); }
+function addPontos(n){
+  if(n>0){ n *= (1 + estrelas*0.15); if(eventoAtivo && eventoAtivo.tipo==='chuva') n *= 2; n = Math.round(n); }
+  pontos = Math.max(0, pontos+n);
+}
 
 // ================= NÍVEL / XP =================
 // quanto maior o nível, mais XP precisa (curva ~n^1.7)
@@ -846,9 +886,11 @@ btnBrilho.addEventListener("click", e=>{
 btnDopa.addEventListener("click", e=>{
   streak++;
   if(streak%5===0) comboMult=Math.min(comboMult+1,8);
-  const ganho = Math.max(1, comboMult + bonusPorClique());
+  let ganho = Math.max(1, comboMult + bonusPorClique());
+  if(eventoAtivo && eventoAtivo.tipo==='febre') ganho *= 2;   // 🔥 febre de clique
   addPontos(ganho);
   brilho -= fatorEscurecimento();
+  contadores.cliques++; progMissao('cliques', 1);   // 🎯 missão
 
   bip(300+streak*8,.05,"square");
   popup(e.clientX,e.clientY,"+"+ganho,"#ffd93d");
@@ -940,31 +982,34 @@ $("btnLoot").addEventListener("click", ()=>{
 // ================= 🎡 ROLETA =================
 // segmentos na ordem do conic-gradient (45° cada)
 const SEG = [
-  {txt:"+40 pontos",   cor:"#00e676", fn:()=>{ const g=Math.round(40*multPremio()); addPontos(g); return "+"+g+" pontos"; }},
-  {txt:"ZEROU NÍVEL 💀",cor:"#ff1744", fn:()=>{ nivel=1; xp=0; }},
-  {txt:"+25 brilho",   cor:"#00b0ff", fn:()=>{ const g=Math.round(25*multPremio()); brilho+=g; return "+"+g+" brilho"; }},
-  {txt:"+ carta 🃏",    cor:"#d500f9", fn:()=>darCarta('comum')},
-  {txt:"PONTOS x2",    cor:"#ffea00", fn:()=>pontos*=2},
-  {txt:"ZEROU PONTOS 💸",cor:"#ff3d00", fn:()=>pontos=0},
-  {txt:"-25 brilho",   cor:"#7c4dff", fn:()=>brilho-=25},
-  {txt:"CARTA RARA 🌈", cor:"#1de9b6", fn:()=>darCarta('rara')},
+  {txt:"+40 pontos",    cor:"#00e676", bom:true,  fn:()=>{ const g=Math.round(40*multPremio()); addPontos(g); return "+"+g+" pontos"; }},
+  {txt:"ZEROU NÍVEL 💀", cor:"#ff1744", bom:false, fn:()=>{ nivel=1; xp=0; return "zerou o nível 💀"; }},
+  {txt:"+25 brilho",    cor:"#00b0ff", bom:true,  fn:()=>{ const g=Math.round(25*multPremio()); brilho+=g; return "+"+g+" brilho"; }},
+  {txt:"+ carta 🃏",     cor:"#d500f9", bom:true,  fn:()=>darCarta('comum')},
+  {txt:"PONTOS x2",     cor:"#ffea00", bom:true,  fn:()=>{ pontos*=2; return "PONTOS x2! ✨"; }},
+  {txt:"-40% pontos 💸", cor:"#ff3d00", bom:false, fn:()=>{ const p=Math.round(pontos*0.4); pontos=Math.max(0,pontos-p); return "-"+p+" pontos 💸"; }},
+  {txt:"-25 brilho",    cor:"#7c4dff", bom:false, fn:()=>{ brilho-=25; return "-25 brilho"; }},
+  {txt:"CARTA RARA 🌈",  cor:"#1de9b6", bom:true,  fn:()=>darCarta('rara')},
 ];
 $("btnRoleta").addEventListener("click", ()=>{
   if(pontos<8||travado.roleta) return;
   addPontos(-8); travado.roleta=true; renderTudo();
+  contadores.giros++; progMissao('giros', 1);   // 🎯 missão
   const i = Math.random()*8|0;
   const desiredMod = (360 - (i*45+22.5)) % 360;
   const atual = ((rotTotal%360)+360)%360;
   const delta = ((desiredMod - atual)%360 + 360)%360;
-  rotTotal += 360*4 + delta;
+  rotTotal += 360*5 + delta;
   $("roda").style.transform = `rotate(${rotTotal}deg)`;
   bip(400,.1,"triangle");
   setTimeout(()=>{
-    const seg = SEG[i];
-    const txt = seg.fn() || seg.txt;   // fn pode devolver o valor já dobrado
-    const bom = !seg.txt.includes("ZEROU") && !seg.txt.includes("-25");
+    // o efeito é SEMPRE o segmento que parou sob o ponteiro (garante visual = resultado)
+    const angTopo = (((360 - (rotTotal % 360)) % 360) + 360) % 360;
+    const iReal = Math.floor(angTopo / 45) % 8;
+    const seg = SEG[iReal];
+    const txt = seg.fn() || seg.txt;
     popup(window.innerWidth/2, 240, txt, seg.cor);
-    if(bom){ chuvaConfete(window.innerWidth/2,240); bip(700,.12,"square"); }
+    if(seg.bom){ chuvaConfete(window.innerWidth/2,240); bip(700,.12,"square"); }
     else { bip(150,.25,"sawtooth"); balanca(); tocar('boom'); }
     travado.roleta=false; renderTudo();
   },3300);
@@ -1021,6 +1066,7 @@ function ganharPet(){
 $("btnOvo").addEventListener("click", ()=>{
   if(pontos < CUSTO_OVO) return;
   addPontos(-CUSTO_OVO);
+  contadores.ovos++; if(typeof progMissao==='function') progMissao('ovos', 1);   // 🎯 missão
   const mp = multPremio();
   const r = Math.random();
   if(r < 0.35){                       // pontos (35%)
@@ -1138,7 +1184,7 @@ function festa(txt){
 }
 
 // ================= DECAIMENTO =================
-setInterval(()=>{ if(brilho>2 && !cortizolLigado()){ brilho-=fatorDecaimento(); renderBrilho(); } },1000);
+setInterval(()=>{ if(brilho>2 && !cortizolLigado() && !(eventoAtivo&&eventoAtivo.tipo==='brilho')){ brilho-=fatorDecaimento(); renderBrilho(); } },1000);
 
 // ================= 🧘 LOW CORTISOL =================
 let cortizolAtivoAte = 0, cortizolCooldownAte = 0;
@@ -1222,6 +1268,100 @@ function mostrarAnuncio(){
 setTimeout(mostrarAnuncio, 6000);
 setInterval(()=>{ if(Math.random()<0.85) mostrarAnuncio(); }, 9000);   // frequentes
 
+// ================= 🏆 LEVA 3 =================
+const salvar = ()=>{ if(window.salvarJogo) window.salvarJogo(); };
+const extraVisivel = ()=> !document.getElementById('pane-extra').hidden;
+
+// --- ⭐ Prestígio ---
+function estrelasSePrestigiar(){ return Math.floor(nivel/5); }
+function prestigiar(){
+  if(estrelasSePrestigiar() <= 0) return;
+  estrelas += estrelasSePrestigiar();
+  pontos=0; nivel=1; xp=0; risco=0; brilho=50;
+  festa('⭐ RENASCEU! '+estrelas+' estrelas');
+  if(typeof tocar==='function') tocar('fah');
+  renderExtra(); renderTudo(); salvar();
+}
+
+// --- 🎯 Missões diárias ---
+const MISSOES_POOL = [
+  { desc:'Clique {a} vezes',        tipo:'cliques', alvo:120 },
+  { desc:'Gire a roleta {a} vezes', tipo:'giros',   alvo:6 },
+  { desc:'Abra {a} ovos de pet',    tipo:'ovos',    alvo:4 },
+  { desc:'Acumule {a} pontos',      tipo:'pontos',  alvo:600 },
+  { desc:'Chegue ao nível {a}',     tipo:'nivel',   alvo:8 },
+];
+const hojeStr = ()=> new Date().toDateString();
+function gerarMissoes(){
+  const emb=[...MISSOES_POOL].sort(()=>Math.random()-0.5).slice(0,3);
+  missoes = { dia: hojeStr(), lista: emb.map(m=>({ ...m, prog:0, feito:false })) };
+}
+function checarMissoesDia(){ if(!missoes || missoes.dia !== hojeStr()) gerarMissoes(); }
+function progMissao(tipo, valor){
+  checarMissoesDia();
+  missoes.lista.forEach(m=>{
+    if(m.feito || m.tipo!==tipo) return;
+    m.prog = (tipo==='pontos'||tipo==='nivel') ? Math.max(m.prog, valor) : m.prog+valor;
+    if(m.prog >= m.alvo){ m.feito=true; addPontos(250); brilho+=10; popup(window.innerWidth/2, window.innerHeight/2, '✅ missão! +250', '#7CFC7C'); if(typeof tocar==='function')tocar('yippee'); renderTudo(); }
+  });
+  if(extraVisivel()) renderExtra();
+}
+
+// --- 🏅 Conquistas ---
+const CONQUISTAS = [
+  { id:'clicar',  emoji:'👆', nome:'Dedo quente',    desc:'clique 100 vezes',    cond:()=>contadores.cliques>=100 },
+  { id:'nivel10', emoji:'🎚️', nome:'Subindo',        desc:'chegue ao nível 10',  cond:()=>nivel>=10 },
+  { id:'rico',    emoji:'💰', nome:'Rico',           desc:'tenha 2000 pontos',   cond:()=>pontos>=2000 },
+  { id:'petEX',   emoji:'💔', nome:'Coração partido',desc:'consiga o pet EX',    cond:()=>(pets.ex||0)>0 },
+  { id:'colecao', emoji:'🐾', nome:'Colecionador',   desc:'tenha todos os pets', cond:()=>PETS.every(p=>(pets[p.id]||0)>0) },
+  { id:'renascer',emoji:'⭐', nome:'Renascido',       desc:'renasça 1 vez',       cond:()=>estrelas>=1 },
+  { id:'onda10',  emoji:'⚔️', nome:'Guerreiro',       desc:'chegue à onda 10',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=10 },
+  { id:'onda25',  emoji:'👹', nome:'Caça-chefão',     desc:'chegue à onda 25',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=25 },
+];
+function checarConquistas(){
+  let nova=false;
+  CONQUISTAS.forEach(c=>{ if(!conquistas[c.id] && c.cond()){ conquistas[c.id]=true; nova=true; popup(window.innerWidth/2, 140, '🏅 '+c.nome+'!', '#ffd93d'); if(typeof tocar==='function')tocar('fah'); } });
+  if(nova){ if(extraVisivel()) renderExtra(); salvar(); }
+}
+
+// --- 🔥 Eventos aleatórios ---
+const EVENTOS = [
+  { tipo:'chuva',  nome:'🌧️ CHUVA DE PONTOS (2x)!', dur:15 },
+  { tipo:'brilho', nome:'❄️ BRILHO CONGELADO!',      dur:15 },
+  { tipo:'febre',  nome:'🔥 FEBRE DE CLIQUE (2x)!',  dur:12 },
+];
+function dispararEvento(){
+  if(eventoAtivo) return;
+  const e = EVENTOS[Math.random()*EVENTOS.length|0];
+  eventoAtivo = { tipo:e.tipo, nome:e.nome, ate: Date.now()+e.dur*1000 };
+  const b=$("eventoBanner"); b.textContent=e.nome; b.classList.add('on');
+  if(typeof tocar==='function') tocar('yippee');
+}
+setInterval(()=>{ if(!eventoAtivo && Math.random()<0.5) dispararEvento(); }, 45000);
+setInterval(()=>{ if(eventoAtivo && Date.now()>eventoAtivo.ate){ eventoAtivo=null; $("eventoBanner").classList.remove('on'); } }, 500);
+
+// passivo: missões de pontos/nível + conquistas
+setInterval(()=>{ checarMissoesDia(); progMissao('pontos', pontos); progMissao('nivel', nivel); checarConquistas(); }, 2500);
+
+function renderExtra(){
+  const g=estrelasSePrestigiar();
+  $("extraPrestigio").innerHTML =
+    `⭐ Estrelas: <b>${estrelas}</b> · bônus de pontos: <b>+${Math.round(estrelas*15)}%</b>
+     <div style="font-size:12px;color:#bbb;margin:6px 0">Renascer zera pontos/nível/brilho, mas dá estrelas permanentes (ganha <b>${g}</b> agora).</div>`;
+  const btn=$("btnRenascer"); btn.disabled=g<=0; btn.textContent=g>0?`⭐ RENASCER (+${g})`:'⭐ precisa nível 5';
+  checarMissoesDia();
+  $("extraMissoes").innerHTML = missoes.lista.map(m=>{
+    const desc=m.desc.replace('{a}', m.alvo), p=Math.min(m.prog, m.alvo);
+    return `<div class="missao ${m.feito?'ok':''}"><span>${m.feito?'✅':'⬜'} ${desc}</span><span class="mp">${Math.floor(p)}/${m.alvo}</span></div>`;
+  }).join('');
+  const total=CONQUISTAS.length, feitas=CONQUISTAS.filter(c=>conquistas[c.id]).length;
+  $("extraConqTitulo").textContent = `🏅 Conquistas (${feitas}/${total})`;
+  $("extraConquistas").innerHTML = CONQUISTAS.map(c=>{
+    const ok=conquistas[c.id];
+    return `<div class="conq ${ok?'ok':'bloq'}"><div class="ce">${ok?c.emoji:'🔒'}</div><div style="text-align:left"><div class="cn">${c.nome}</div><div class="cd">${c.desc}</div></div></div>`;
+  }).join('');
+}
+
 // ================= MUTE =================
 $("btnMute").addEventListener("click", ()=>{ somLigado=!somLigado; $("btnMute").textContent=somLigado?"🔊 som":"🔇 mudo"; });
 
@@ -1232,11 +1372,13 @@ document.querySelectorAll(".abaBtn").forEach(b=>{
     b.classList.add("ativa");
     document.querySelectorAll(".pane").forEach(p=>p.hidden=true);
     $("pane-"+b.dataset.aba).hidden=false;
+    if(b.dataset.aba==='extra') renderExtra();
   });
 });
+$("btnRenascer").addEventListener("click", prestigiar);
 
 // ================= RÓTULOS DA ROLETA =================
-const SEG_LABEL = ["+40 PTS","ZERA\nNÍVEL 💀","+25\nBRILHO","+ CARTA 🃏","PONTOS\nx2 ✨","ZERA\nPONTOS 💸","-25\nBRILHO","CARTA\nRARA 🌈"];
+const SEG_LABEL = ["+40 PTS","ZERA\nNÍVEL 💀","+25\nBRILHO","+ CARTA 🃏","PONTOS\nx2 ✨","-40%\nPONTOS 💸","-25\nBRILHO","CARTA\nRARA 🌈"];
 function montaLabels(){
   const roda=$("roda");
   SEG_LABEL.forEach((t,i)=>{
@@ -1822,6 +1964,7 @@ renderCartas(); renderPets(); renderTudo();
     try{
       localStorage.setItem('dopa_v1', JSON.stringify({
         pontos, brilho, nivel, xp, risco, pets, cartas,
+        estrelas, conquistas, contadores, missoes,
         bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda }
       }));
     }catch(e){}
@@ -1837,6 +1980,10 @@ renderCartas(); renderPets(); renderTudo();
       if(Number.isFinite(d.risco))  risco=d.risco;
       if(d.pets && typeof d.pets==='object') pets=d.pets;
       if(Array.isArray(d.cartas)) cartas=d.cartas;
+      if(Number.isFinite(d.estrelas)) estrelas=d.estrelas;
+      if(d.conquistas && typeof d.conquistas==='object') conquistas=d.conquistas;
+      if(d.contadores && typeof d.contadores==='object') contadores=Object.assign({cliques:0,giros:0,ovos:0}, d.contadores);
+      if(d.missoes && typeof d.missoes==='object') missoes=d.missoes;
       if(d.bat){ const b=d.bat;
         if(b.armasCompradas) armasCompradas=b.armasCompradas;
         if(b.armaEquipada)   armaEquipada=b.armaEquipada;
@@ -1852,6 +1999,7 @@ renderCartas(); renderPets(); renderTudo();
     }catch(e){}
   }
   window.salvarJogo = salvarJogo;
+  window.getRecordeOnda = ()=>recordeOnda;
   carregarJogo();
   setInterval(salvarJogo, 4000);
   window.addEventListener('beforeunload', salvarJogo);
