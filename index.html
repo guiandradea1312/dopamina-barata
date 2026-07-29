@@ -372,6 +372,13 @@
     background: rgba(0,0,0,.4); font-size: 52px; font-weight: bold; color: #ffd93d; text-shadow: 0 0 30px #ffd93d; animation: pulso .5s infinite alternate; text-align:center; }
   @keyframes pulso { to { transform: scale(1.1); } }
 
+  #loginDiario { position: fixed; inset: 0; z-index: 1500; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.7); }
+  #loginDiario[hidden] { display: none; }
+  .ldCard { background: linear-gradient(160deg,#1a1630,#0d0d16); border: 2px solid #ffd93d; border-radius: 18px; padding: 26px 30px; text-align: center; box-shadow: 0 0 40px #ffd93d55; animation: pulso .8s infinite alternate; max-width: 90vw; }
+  .ldTitulo { font-size: 30px; font-weight: bold; color: #ffd93d; text-shadow: 0 0 16px #ffd93d88; }
+  .ldDias { font-size: 16px; color: #ff9f43; margin: 8px 0; font-weight: bold; }
+  .ldPremio { font-size: 20px; color: #7CFC7C; margin: 10px 0 16px; line-height: 1.5; }
+
   .mute { position: fixed; bottom: 12px; right: 12px; z-index: 810; background: #222; border: 1px solid #444; color: #aaa; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
 
   /* ===== anúncios falsos ===== */
@@ -591,6 +598,10 @@
         <div id="extraStats" class="statsGrid"></div>
       </div>
       <div class="extraBloco">
+        <div class="extraTitulo">🏆 Recordes (seu melhor)</div>
+        <div id="extraRecordes" class="statsGrid"></div>
+      </div>
+      <div class="extraBloco">
         <div class="extraTitulo">😈 Modo Chato</div>
         <div style="font-size:12px;color:#bbb;margin-bottom:8px">Pra quem quer sofrer: a tela escurece <b>bem mais rápido</b> e os anúncios aparecem sem parar.</div>
         <button class="btn btn-vermelho2" id="btnModoChato" style="max-width:260px">😈 ativar modo chato</button>
@@ -626,6 +637,15 @@
 
   <div id="ganhou"></div>
 
+  <div id="loginDiario" hidden>
+    <div class="ldCard">
+      <div class="ldTitulo">🎁 Bônus diário!</div>
+      <div class="ldDias" id="ldDias">🔥 1 dia seguido</div>
+      <div class="ldPremio" id="ldPremio"></div>
+      <button class="btn btn-verde" id="ldResgatar" style="max-width:220px">RESGATAR</button>
+    </div>
+  </div>
+
   <div id="cortizolInd"></div>
 
   <div id="escuridao"></div>
@@ -644,6 +664,7 @@
     <button class="batBtn jogar" id="btnJogarIdle">▶️ Jogar — Auto (idle)</button>
     <button class="batBtn jogar" id="btnJogarAndar">🏃 Jogar — Andar (WASD / toque)</button>
     <button class="batBtn jogar" id="btnCampanha">🧟 Campanha</button>
+    <button class="batBtn sec" id="btnHardcore">💀 Hardcore: OFF</button>
     <button class="batBtn sec" id="btnLoja">🛒 Loja de Armas</button>
     <button class="batBtn sec" id="btnArvore">🌳 Árvore de Habilidade</button>
     <button class="batBtn sec" id="btnSairMenu">✖ Sair do modo batalha</button>
@@ -707,6 +728,10 @@ let pontos = 0, brilho = 50, nivel = 1;
 // Leva 3: prestígio, conquistas, missões, eventos
 let estrelas = 0, conquistas = {}, contadores = { cliques:0, giros:0, ovos:0 }, missoes = null, eventoAtivo = null;
 let modoChato = false;   // Leva 5: UI ainda mais insuportável
+// Leva 6: login diário, recordes locais, hardcore
+let ultimoLogin = null, diasSeguidos = 0;
+let recordes = { slot:0, loot:0, roleta:0, clique:0, onda:0 };
+let modoHardcore = false;
 let streak = 0, streakTimer = null, comboMult = 1;
 let somLigado = true;
 let risco = 0, xp = 0;
@@ -972,6 +997,7 @@ btnDopa.addEventListener("click", e=>{
   let ganho = Math.max(1, comboMult + bonusPorClique());
   if(eventoAtivo && eventoAtivo.tipo==='febre') ganho *= 2;   // 🔥 febre de clique
   addPontos(ganho);
+  registrarRecorde('clique', ganho, true);   // silencioso pra não spammar
   brilho -= fatorEscurecimento();
   contadores.cliques++; progMissao('cliques', 1);   // 🎯 missão
 
@@ -1036,6 +1062,7 @@ $("btnSlot").addEventListener("click", ()=>{
     else if(res[0]===res[1]||res[1]===res[2]||res[0]===res[2]){ premio=5*multPremio(); msg="par!"; }
     if(premio>0){
       addPontos(premio); popup(window.innerWidth/2,240,"+"+premio+" "+msg,"#7CFC7C");
+      registrarRecorde('slot', premio);
       bip(700,.15,"square"); if(premio>=30) festa(msg+" +"+premio);
     } else { popup(window.innerWidth/2,240,"nada 😐","#888"); bip(150,.15,"sawtooth"); }
     travado.slot=false; renderTudo();
@@ -1052,10 +1079,10 @@ $("btnLoot").addEventListener("click", ()=>{
     caixa.classList.remove("mexe");
     const mp = multPremio();
     const r=Math.random();
-    if(r<0.30){ const g=Math.round((8+Math.random()*14|0)*mp); addPontos(g); popup(window.innerWidth/2,240,"+"+g+" pts","#ffd93d"); }
+    if(r<0.30){ const g=Math.round((8+Math.random()*14|0)*mp); addPontos(g); registrarRecorde('loot', g); popup(window.innerWidth/2,240,"+"+g+" pts","#ffd93d"); }
     else if(r<0.50){ const g=Math.round((8+Math.random()*10|0)*mp); brilho+=g; popup(window.innerWidth/2,240,"+"+g+"% brilho","#6ec6ff"); }
     else if(r<0.85){ darCarta('comum'); }
-    else if(r<0.96){ const g=Math.round(50*mp); addPontos(g); popup(window.innerWidth/2,240,"+"+g+" pts ✨","#7CFC7C"); festa("ÉPICO! +"+g+" ✨"); }
+    else if(r<0.96){ const g=Math.round(50*mp); addPontos(g); registrarRecorde('loot', g); popup(window.innerWidth/2,240,"+"+g+" pts ✨","#7CFC7C"); festa("ÉPICO! +"+g+" ✨"); }
     else { darCarta('rara'); festa("LENDÁRIO! 🌈"); }
     caixa.textContent="🎉"; setTimeout(()=>caixa.textContent="🎁",700);
     travado.loot=false; renderTudo();
@@ -1090,7 +1117,9 @@ $("btnRoleta").addEventListener("click", ()=>{
     const angTopo = (((360 - (rotTotal % 360)) % 360) + 360) % 360;
     const iReal = Math.floor(angTopo / 45) % 8;
     const seg = SEG[iReal];
+    const antesPts = pontos;
     const txt = seg.fn() || seg.txt;
+    const ganhoR = pontos - antesPts; if(ganhoR > 0) registrarRecorde('roleta', ganhoR);
     popup(window.innerWidth/2, 240, txt, seg.cor);
     if(seg.bom){ chuvaConfete(window.innerWidth/2,240); bip(700,.12,"square"); }
     else { bip(150,.25,"sawtooth"); balanca(); tocar('boom'); }
@@ -1313,6 +1342,41 @@ function festa(txt){
   setTimeout(()=>{ g.style.display="none"; },1200);
 }
 
+// ================= 🎁 LOGIN DIÁRIO =================
+function checarLoginDiario(){
+  const hoje = new Date().toDateString();
+  if(ultimoLogin === hoje) return;                        // já pegou hoje
+  const ontem = new Date(Date.now()-86400000).toDateString();
+  diasSeguidos = (ultimoLogin === ontem) ? diasSeguidos+1 : 1;   // mantém streak ou reseta
+  ultimoLogin = hoje;
+  const bonusPts = 100 + diasSeguidos*50;
+  const bonusBri = 10 + diasSeguidos*2;
+  addPontos(bonusPts); brilho += bonusBri;
+  $("ldDias").textContent = `🔥 ${diasSeguidos} dia${diasSeguidos>1?'s':''} seguido${diasSeguidos>1?'s':''}`;
+  $("ldPremio").innerHTML = `+${bonusPts} pontos 💰<br>+${bonusBri}% brilho 💡`;
+  $("loginDiario").hidden = false;
+  if(typeof tocar==='function') tocar('yippee');
+  chuvaConfete(window.innerWidth/2, window.innerHeight/2);
+  if(window.salvarJogo) window.salvarJogo();
+  renderTudo();
+}
+$("ldResgatar").addEventListener("click", ()=>{
+  $("loginDiario").hidden = true;
+  chuvaConfete(window.innerWidth/2, window.innerHeight/2);
+  bip(900,.1,"square");
+});
+
+// ================= 🏆 RECORDES LOCAIS =================
+function registrarRecorde(chave, valor, silencioso){
+  valor = Math.round(valor);
+  if(valor > (recordes[chave]||0)){
+    recordes[chave] = valor;
+    if(!silencioso){ popup(window.innerWidth/2, 300, "🏆 novo recorde! +"+valor, "#ffcf40"); bip(1000,.1,"square"); }
+    return true;
+  }
+  return false;
+}
+
 // ================= DECAIMENTO =================
 setInterval(()=>{ if(brilho>2 && !cortizolLigado() && !(eventoAtivo&&eventoAtivo.tipo==='brilho')){ brilho-=fatorDecaimento(); renderBrilho(); } },1000);
 
@@ -1509,8 +1573,18 @@ function renderStats(){
     ['🥚 Ovos',         contadores.ovos||0],
     ['🐾 Pets',         petsTem+'/'+PETS.length],
     ['🏆 Recorde onda', recOnda],
+    ['🔥 Dias seguidos', diasSeguidos],
   ];
   box.innerHTML = stats.map(([l,v])=>`<div class="statCard"><div class="sv">${v}</div><div class="sl">${l}</div></div>`).join('');
+  // 🏆 recordes por minigame
+  const recs = [
+    ['🖱️ Clique',  recordes.clique||0],
+    ['🎰 Slot',    recordes.slot||0],
+    ['🎁 Loot',    recordes.loot||0],
+    ['🎡 Roleta',  recordes.roleta||0],
+  ];
+  const rbox = $("extraRecordes");
+  if(rbox) rbox.innerHTML = recs.map(([l,v])=>`<div class="statCard"><div class="sv">${v}</div><div class="sl">maior ${l}</div></div>`).join('');
 }
 // ============ 😈 MODO CHATO ============
 function renderModoChato(){ const b=$("btnModoChato"); if(b) b.textContent = modoChato ? '😇 desativar modo chato' : '😈 ativar modo chato'; }
@@ -1836,6 +1910,7 @@ renderCartas(); renderPets(); renderTudo();
     enemies=[]; projs=[]; fluts=[]; parts=[]; teclas={}; touchAlvo=null;
     explosoes=[]; raiosVisuais=[]; inimProjs=[]; chuvaResta=0; frenzyT=0; especialCD=3; shakeT=0;
     reviveRestante = temPet('ex') ? 1 : 0;   // 💔 EX revive 1x
+    if(modoHardcore){ player.hpMax=1; player.hp=1; reviveRestante=0; }   // 💀 1 vida, sem revive
     onda=0; killCount=0; ptsGanhos=0; atkT=0; emBreak=false; graceT=1.5;
     proximaOnda();
     jogando=true; pausado=false; ultimoT=performance.now();
@@ -2154,9 +2229,11 @@ renderCartas(); renderPets(); renderTudo();
 
   function fim(){
     jogando=false; campanhaAtiva=false; $b('batUpgrades').hidden=true; $b('batFim').hidden=false;
-    $b('batFimTitulo').textContent='☠️ FIM';
+    $b('batFimTitulo').textContent = modoHardcore ? '💀 FIM (HARDCORE)' : '☠️ FIM';
     const novoRecorde = onda>recordeOnda; if(novoRecorde) recordeOnda=onda;
-    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
+    let bonusHC = 0;
+    if(modoHardcore){ bonusHC = ptsGanhos; if(bonusHC>0 && typeof addPontos==='function') addPontos(bonusHC); }   // 💀 dobra os pontos
+    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos${bonusHC>0?` <span style="color:#ff5252">(+${bonusHC} 💀)</span>`:''}<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
     if(typeof tocar==='function')tocar('boom'); if(typeof salvarJogo==='function')salvarJogo(); if(typeof renderTudo==='function')renderTudo();
   }
   function pararJogo(){ jogando=false; pausado=false; }
@@ -2174,6 +2251,9 @@ renderCartas(); renderPets(); renderTudo();
   $b('btnJogarIdle').onclick=()=>iniciarBatalha('idle');
   $b('btnJogarAndar').onclick=()=>iniciarBatalha('andar');
   $b('btnCampanha').onclick=()=>{ tela('batCampanha'); renderCampanha(); };
+  function renderHardcore(){ const b=$b('btnHardcore'); b.textContent='💀 Hardcore: '+(modoHardcore?'ON':'OFF'); b.classList.toggle('turbo', modoHardcore); }
+  $b('btnHardcore').onclick=()=>{ modoHardcore=!modoHardcore; renderHardcore(); if(typeof salvarJogo==='function')salvarJogo(); };
+  renderHardcore();
   $b('btnLoja').onclick=()=>{ tela('batLoja'); renderLoja(); };
   $b('btnArvore').onclick=()=>{ arvoreDeBatalha=false; tela('batArvore'); renderArvore(); };
   $b('batArvBtn').onclick=()=>{ if(jogando){ pausado=true; arvoreDeBatalha=true; tela('batArvore'); renderArvore(); } };
@@ -2205,6 +2285,7 @@ renderCartas(); renderPets(); renderTudo();
       localStorage.setItem('dopa_v1', JSON.stringify({
         pontos, brilho, nivel, xp, risco, pets, petsDourados, cartas,
         estrelas, conquistas, contadores, missoes, modoChato,
+        ultimoLogin, diasSeguidos, recordes, modoHardcore,
         bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda, campanhaProg }
       }));
     }catch(e){}
@@ -2226,6 +2307,10 @@ renderCartas(); renderPets(); renderTudo();
       if(d.contadores && typeof d.contadores==='object') contadores=Object.assign({cliques:0,giros:0,ovos:0}, d.contadores);
       if(d.missoes && typeof d.missoes==='object') missoes=d.missoes;
       if(typeof d.modoChato==='boolean'){ modoChato=d.modoChato; if(typeof renderModoChato==='function') renderModoChato(); }
+      if(typeof d.ultimoLogin==='string') ultimoLogin=d.ultimoLogin;
+      if(Number.isFinite(d.diasSeguidos)) diasSeguidos=d.diasSeguidos;
+      if(d.recordes && typeof d.recordes==='object') recordes=Object.assign({slot:0,loot:0,roleta:0,clique:0,onda:0}, d.recordes);
+      if(typeof d.modoHardcore==='boolean') modoHardcore=d.modoHardcore;
       if(d.bat){ const b=d.bat;
         if(b.armasCompradas) armasCompradas=b.armasCompradas;
         if(b.armaEquipada)   armaEquipada=b.armaEquipada;
@@ -2250,6 +2335,8 @@ renderCartas(); renderPets(); renderTudo();
     salvarJogo();
   };
   carregarJogo();
+  renderHardcore();   // reflete o estado salvo no botão
+  if(typeof checarLoginDiario==='function') setTimeout(checarLoginDiario, 600);   // 🎁 bônus diário
   setInterval(salvarJogo, 4000);
   window.addEventListener('beforeunload', salvarJogo);
   document.addEventListener('visibilitychange', ()=>{ if(document.hidden) salvarJogo(); });
