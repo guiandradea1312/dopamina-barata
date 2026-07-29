@@ -1635,6 +1635,8 @@ renderCartas(); renderPets(); renderTudo();
   ];
 
   const $b = id => document.getElementById(id);
+  // 💎 melhoria a cada 5 ondas até a 30, depois de 10 em 10 (igual às cartas)
+  function deveMelhoria(w){ return typeof ganhaCartaNivel==='function' ? ganhaCartaNivel(w) : (w<=30 ? w%5===0 : w%10===0); }
   function petBonus(){ let d=0,v=0; PETS.forEach(p=>{ const g=(petsDourados[p.id]||0)>0; if(g||(pets[p.id]||0)>0){ const b=PET_COMBATE[p.tier]; if(b){ const m=g?1.8:1; d+=b.dano*m; v+=b.vida*m; } } }); return {d:Math.round(d),v:Math.round(v)}; }
   const temPet = id => (pets[id]||0) > 0 || (petsDourados[id]||0) > 0;
   // 🔫 nível da arma (evolução): true = nível 1 (saves antigos)
@@ -2032,8 +2034,11 @@ renderCartas(); renderPets(); renderTudo();
     if(toastT>0) toastT-=dt;
     if(shakeT>0) shakeT-=dt;
 
-    // onda limpa → escolher upgrade (💎), depois próxima onda
-    if(filaSpawn.length===0 && enemies.length===0 && !emBreak){ emBreak=true; abrirUpgrades(); }
+    // onda limpa → melhoria a cada 5 ondas (até 30, depois de 10 em 10); senão vai direto
+    if(filaSpawn.length===0 && enemies.length===0 && !emBreak){
+      if(deveMelhoria(onda+1)){ emBreak=true; abrirUpgrades(); }
+      else proximaOnda();
+    }
 
     if(player.hp<=0){
       if(reviveRestante>0){ reviveRestante--; player.hp=player.hpMax*0.5; graceT=1.6; tremer(16); toast('💔 EX te reviveu!'); if(typeof tocar==='function')tocar('fah'); }
