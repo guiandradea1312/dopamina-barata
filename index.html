@@ -288,7 +288,8 @@
   .batItem .info .n { font-weight: bold; font-size: 14px; }
   .batItem .info .s { font-size: 11px; color: #aaa; }
   .batItem .aBtn { font-family: inherit; font-weight: bold; font-size: 12px; padding: 8px 12px; border: none; border-radius: 8px; cursor: pointer; color: #fff; }
-  .aBtn.comprar { background: #2e6d2e; } .aBtn.equipar { background: #2a6d99; } .aBtn.equipada { background: #555; }
+  .aBtn.comprar { background: #2e6d2e; } .aBtn.equipar { background: #2a6d99; } .aBtn.equipada { background: #555; } .aBtn.evoluir { background: #a06a00; }
+  .batItem .acoes { display: flex; flex-direction: column; gap: 5px; }
   .aBtn:disabled { opacity: .4; cursor: not-allowed; }
   .habGrid { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; width: 100%; max-width: 620px; }
   .ramo { display: flex; flex-direction: column; align-items: center; gap: 0; width: 158px; }
@@ -359,6 +360,22 @@
 
   .mute { position: fixed; bottom: 12px; right: 12px; z-index: 810; background: #222; border: 1px solid #444; color: #aaa; border-radius: 8px; padding: 6px 10px; font-size: 12px; cursor: pointer; }
 
+  /* ===== anúncios falsos ===== */
+  .anuncio {
+    position: fixed; z-index: 1500; width: 250px;
+    background: linear-gradient(135deg,#ff4da6,#ffb14e); color: #111;
+    border: 3px solid #fff; border-radius: 14px; padding: 14px 12px 12px; text-align: center;
+    box-shadow: 0 8px 30px #000a, 0 0 0 3px #ff2d78; animation: anuTremor .5s ease-in-out infinite alternate;
+  }
+  @keyframes anuTremor { from { transform: rotate(-1.2deg); } to { transform: rotate(1.2deg); } }
+  .anuncioTag { position: absolute; top: -10px; left: 8px; background: #222; color: #ffd93d; font-size: 9px; font-weight: bold; padding: 1px 6px; border-radius: 6px; letter-spacing: 1px; }
+  .anuncioX { position: absolute; top: 4px; right: 8px; font-size: 18px; color: #400; cursor: pointer; font-weight: bold; }
+  .anuncioEmoji { font-size: 40px; line-height: 1; }
+  .anuncioTitulo { font-weight: bold; font-size: 18px; margin: 2px 0; text-shadow: 0 1px 0 #fff8; }
+  .anuncioTexto { font-size: 12px; margin-bottom: 10px; }
+  .anuncioBtn { font-family: inherit; font-weight: bold; font-size: 14px; padding: 9px 14px; border: none; border-radius: 10px; background: #16a34a; color: #fff; cursor: pointer; width: 100%; box-shadow: 0 3px 0 #0a5; animation: anuBtn .8s infinite alternate; }
+  @keyframes anuBtn { to { filter: brightness(1.2); } }
+
   /* ===== CELULAR ===== */
   @media (max-width: 600px) {
     #hud { gap: 6px; top: 6px; }
@@ -386,6 +403,25 @@
     #noti .x { font-size: 26px; top: 8px; right: 12px; }
 
     #cortizolInd { top: auto; bottom: 54px; left: 8px; font-size: 12px; }
+
+    /* anúncios menores */
+    .anuncio { width: 210px; }
+    .anuncioTitulo { font-size: 16px; }
+
+    /* ===== batalha no celular ===== */
+    #batHud { padding: 6px 8px; gap: 6px; font-size: 11px; }
+    #batHud .hpwrap { min-width: 100%; order: -1; }
+    #batHud .tag { padding: 3px 6px; }
+    .batBtn { font-size: 14px; padding: 11px 16px; min-width: 180px; }
+    #batEspBtn { width: 56px; height: 56px; bottom: 12px; left: 12px; }
+    #batPauseBtn { width: 46px; height: 46px; bottom: 12px; right: 12px; font-size: 18px; }
+    #batArvBtn { width: 46px; height: 46px; bottom: 12px; right: 66px; font-size: 18px; }
+    #batVelBtn { width: 46px; height: 46px; bottom: 66px; right: 12px; font-size: 15px; }
+    .upgCard { width: 44%; max-width: 150px; padding: 12px 8px; }
+    .upgCard .ue { font-size: 30px; } .upgCard .un { font-size: 13px; }
+    .batLista { max-width: 94vw; }
+    .habGrid { gap: 10px; }
+    .ramo { width: 30%; min-width: 120px; }
   }
 </style>
 </head>
@@ -1148,6 +1184,44 @@ noti.querySelector(".x").addEventListener("click", e=>{ e.stopPropagation(); not
 noti.addEventListener("click", ()=>{ addPontos(3); noti.classList.remove("on"); popup(window.innerWidth/2, window.innerHeight/2, "+3 🎁","#ffd93d"); renderTudo(); setTimeout(soltaNoti,9000); });
 setTimeout(soltaNoti,4000);
 
+// ================= 📢 ANÚNCIOS FALSOS =================
+const ANUNCIOS = [
+  { emoji:'🎉', titulo:'PARABÉNS!!!',    texto:'Você é o visitante 1.000.000!',      botao:'RESGATAR PRÊMIO', premio:'pts' },
+  { emoji:'🔥', titulo:'TRUQUE SECRETO',  texto:'Ganhe pontos INFINITOS agora!',      botao:'EU QUERO',        premio:'pts' },
+  { emoji:'💎', titulo:'PET LENDÁRIO',    texto:'Um EX 💔 quer te conhecer 😏',       botao:'VER AGORA',       premio:'nada' },
+  { emoji:'👑', titulo:'CLUBE VIP',       texto:'Você foi selecionado! Só hoje.',     botao:'ENTRAR GRÁTIS',   premio:'brilho' },
+  { emoji:'🍬', titulo:'DOPAMINA GRÁTIS', texto:'Por tempo LIMITADÍSSIMO!',           botao:'PEGAR',           premio:'pts' },
+  { emoji:'⚠️', titulo:'ALERTA!',         texto:'Seu brilho corre perigo!',           botao:'PROTEGER',        premio:'nada' },
+  { emoji:'📱', titulo:'VOCÊ GANHOU',     texto:'Um prêmio misterioso te espera',     botao:'ABRIR CAIXA',     premio:'aleatorio' },
+  { emoji:'💰', titulo:'DINHEIRO FÁCIL',  texto:'Clique e fique rico em pontos!',     botao:'FICAR RICO',      premio:'pts' },
+];
+function mostrarAnuncio(){
+  if(document.getElementById('batalhaTela').classList.contains('on')) return;   // não durante a batalha
+  if(document.querySelectorAll('.anuncio').length >= 2) return;                  // no máx 2 na tela
+  const a = ANUNCIOS[Math.random()*ANUNCIOS.length|0];
+  const el = document.createElement('div'); el.className='anuncio';
+  el.style.left = (4 + Math.random()*52) + 'vw';
+  el.style.top  = (12 + Math.random()*58) + 'vh';
+  el.innerHTML = `<span class="anuncioTag">anúncio</span><span class="anuncioX">✕</span>
+    <div class="anuncioEmoji">${a.emoji}</div>
+    <div class="anuncioTitulo">${a.titulo}</div>
+    <div class="anuncioTexto">${a.texto}</div>
+    <button class="anuncioBtn">${a.botao}</button>`;
+  el.querySelector('.anuncioX').onclick = ()=> el.remove();      // X normal, fecha de boa
+  el.querySelector('.anuncioBtn').onclick = ()=>{
+    const cx=window.innerWidth/2, cy=window.innerHeight/2;
+    if(a.premio==='pts'){ const g=5+Math.random()*20|0; addPontos(g); popup(cx,cy,'+'+g+' 🎁','#ffd93d'); }
+    else if(a.premio==='brilho'){ brilho+=8; popup(cx,cy,'+8% 💡','#6ec6ff'); }
+    else if(a.premio==='aleatorio'){ if(Math.random()<0.5){ const g=15+Math.random()*20|0; addPontos(g); popup(cx,cy,'+'+g+' 🎁','#ffd93d'); } else popup(cx,cy,'caixa vazia 😈','#ff5252'); }
+    else popup(cx,cy,'era mentira 😈','#ff5252');
+    renderTudo(); el.remove();
+  };
+  document.body.appendChild(el);
+  bip(880,.05,'square',.08);
+}
+setTimeout(mostrarAnuncio, 6000);
+setInterval(()=>{ if(Math.random()<0.85) mostrarAnuncio(); }, 9000);   // frequentes
+
 // ================= MUTE =================
 $("btnMute").addEventListener("click", ()=>{ somLigado=!somLigado; $("btnMute").textContent=somLigado?"🔊 som":"🔇 mudo"; });
 
@@ -1227,6 +1301,15 @@ renderCartas(); renderPets(); renderTudo();
     { emoji:'🔥', vida:22, dano:9,  vel:1.5,  r:16, xp:12, pts:6,  min:5 }, // meteoro dano alto
   ];
 
+  // 🐲 chefões variados (cada um com um poder)
+  const BOSSES = [
+    { emoji:'👹', poder:'atirar',    nome:'Ogro',     dica:'atira e invoca' },
+    { emoji:'👻', poder:'teleporte', nome:'Fantasma', dica:'teleporta' },
+    { emoji:'🗿', poder:'escudo',    nome:'Guardião', dica:'fica invencível' },
+    { emoji:'👾', poder:'dividir',   nome:'Divisor',  dica:'divide em 2' },
+    { emoji:'🧲', poder:'puxar',     nome:'Ímã',      dica:'te puxa' },
+  ];
+
   // progressão (persiste entre partidas na sessão)
   let armasCompradas = { basica:true }, armaEquipada = 'basica';
   let hab = {}, heroiNivel = 1, heroiXP = 0, pontosHab = 0, recordeOnda = 0;
@@ -1250,16 +1333,20 @@ renderCartas(); renderPets(); renderTudo();
 
   const $b = id => document.getElementById(id);
   function petBonus(){ let d=0,v=0; PETS.forEach(p=>{ if((pets[p.id]||0)>0){ const b=PET_COMBATE[p.tier]; if(b){ d+=b.dano; v+=b.vida; } } }); return {d,v}; }
+  const temPet = id => (pets[id]||0) > 0;
+  // 🔫 nível da arma (evolução): true = nível 1 (saves antigos)
+  function nvArma(id){ const v=armasCompradas[id]; return v===true?1:(v||0); }
   function habNv(id){ return hab[id]||0; }
   function xpNec(n){ return Math.round(50*Math.pow(n,1.5)); }
   function stats(){
     const arma = ARMAS.find(a=>a.id===armaEquipada) || ARMAS[0], pb = petBonus(), r = runBuffs;
+    const nvA = Math.max(1, nvArma(armaEquipada)), evo = 1 + (nvA-1)*0.30;
     return {
-      arma,
+      arma, nivelArma: nvA,
       vidaMax: 200 + habNv('de1')*25 + habNv('de4')*80 + pb.v + r.vidaBonus,
-      dano: (arma.dano + pb.d) * (1 + habNv('of1')*0.15 + r.dano),
-      cadencia: arma.cadencia * (1 + habNv('of2')*0.10 + r.cad),
-      crit: habNv('of3')*0.05 + r.crit,
+      dano: (arma.dano*evo + pb.d) * (1 + habNv('of1')*0.15 + r.dano),
+      cadencia: arma.cadencia * (1 + (nvA-1)*0.06) * (1 + habNv('of2')*0.10 + r.cad),
+      crit: habNv('of3')*0.05 + r.crit + (temPet('aguia')?0.10:0),
       tiros: (arma.tiros||1) + habNv('of4') + r.proj,
       regen: habNv('de2') + r.regen,
       reducao: Math.min(0.7, habNv('de3')*0.08 + r.reducao),
@@ -1267,6 +1354,7 @@ renderCartas(); renderPets(); renderTudo();
       alcance: arma.alcance * (1 + habNv('ut2')*0.12 + r.alcance),
       vampiro: habNv('ut3')*2 + r.vampiro,
       rewardMult: 1 + habNv('ut4')*0.20,
+      cdMult: temPet('misterio') ? 0.85 : 1,
       projVel: arma.projVel, area: (arma.area||0) + r.area, lentidao: arma.lentidao||0,
     };
   }
@@ -1277,7 +1365,7 @@ renderCartas(); renderPets(); renderTudo();
   let player, enemies=[], projs=[], fluts=[], parts=[];
   let onda=0, filaSpawn=[], spawnT=0, breakT=0, emBreak=false;
   let atkT=0, ultimoT=0, killCount=0, ptsGanhos=0, graceT=0;
-  let teclas={}, touchAlvo=null, curStats=null;
+  let teclas={}, touchAlvo=null, curStats=null, reviveRestante=0;
   let toastTxt='', toastT=0;
   // especiais
   let velocidadeJogo=1, arvoreDeBatalha=false;
@@ -1293,32 +1381,41 @@ renderCartas(); renderPets(); renderTudo();
 
   function renderResumo(){
     const s=stats(), pb=petBonus();
+    const passivas=[]; if(temPet('ex')) passivas.push('💔 revive 1x'); if(temPet('aguia')) passivas.push('🦅 +10% crít'); if(temPet('misterio')) passivas.push('🥸 -15% recarga');
     $b('batResumoTela').innerHTML =
       `❤️ Vida: <b>${Math.round(s.vidaMax)}</b><br>
        💥 Dano: <b>${s.dano.toFixed(1)}</b> · 🔫 <b>${s.cadencia.toFixed(1)}/s</b><br>
-       🗡️ Arma: <b>${s.arma.emoji} ${s.arma.nome}</b><br>
+       🗡️ Arma: <b>${s.arma.emoji} ${s.arma.nome}${s.nivelArma>1?' ★Nv'+s.nivelArma:''}</b><br>
        ⚡ Especial: <b style="color:#ffd93d">${s.arma.especial ? s.arma.especial.nome : '—'}</b> <span style="color:#888">(Espaço/⚡)</span><br>
        🐾 Bônus dos pets: <b>+${pb.d} dano · +${pb.v} vida</b><br>
+       🎯 Passivas: <b>${passivas.length?passivas.join(' · '):'—'}</b><br>
        🎖️ Herói nível <b>${heroiNivel}</b> · XP ${Math.floor(heroiXP)}/${xpNec(heroiNivel)}<br>
        🌳 Pontos de habilidade: <b>${pontosHab}</b><br>
        🏆 Recorde: <b>onda ${recordeOnda}</b>`;
   }
 
+  function custoEvo(a){ return Math.round(Math.max(a.custo,200) * (nvArma(a.id)+1) * 0.6); }
   function renderLoja(){
     const box=$b('batLojaLista'); box.innerHTML='';
     ARMAS.forEach(a=>{
-      const owned=!!armasCompradas[a.id], eq=armaEquipada===a.id;
+      const nvA=nvArma(a.id), owned=nvA>0, eq=armaEquipada===a.id;
       const div=document.createElement('div'); div.className='batItem';
-      let btn;
-      if(!owned) btn=`<button class="aBtn comprar" ${pontos<a.custo?'disabled':''}>💰 ${a.custo}</button>`;
-      else if(eq) btn=`<button class="aBtn equipada" disabled>equipada</button>`;
-      else btn=`<button class="aBtn equipar">equipar</button>`;
-      div.innerHTML=`<div class="ie">${a.emoji}</div><div class="info"><div class="n">${a.nome}</div>
+      const estrelas = nvA>1 ? ' '+'★'.repeat(Math.min(nvA-1,5)) : '';
+      let acoes;
+      if(!owned){
+        acoes=`<button class="aBtn comprar" ${pontos<a.custo?'disabled':''}>💰 ${a.custo}</button>`;
+      } else {
+        const ev=custoEvo(a);
+        acoes=`${eq?'<button class="aBtn equipada" disabled>equipada</button>':'<button class="aBtn equipar">equipar</button>'}
+               <button class="aBtn evoluir" ${pontos<ev?'disabled':''} title="junta uma cópia = evolui">⬆ ${ev}</button>`;
+      }
+      div.innerHTML=`<div class="ie">${a.emoji}</div><div class="info"><div class="n">${a.nome}<span style="color:#ffd93d">${estrelas}</span>${nvA>1?` <span style="color:#888;font-size:10px">Nv ${nvA}</span>`:''}</div>
         <div class="s">💥 ${a.dano} · 🔫 ${a.cadencia}/s · 🎯 ${a.alcance}${a.area?' · 💥 área':''}${a.tiros?' · '+a.tiros+' tiros':''}${a.lentidao?' · ❄️':''}</div>
-        <div class="s" style="color:#ffd93d">⚡ ${a.especial?a.especial.nome:'—'}</div></div>${btn}`;
-      const b=div.querySelector('.aBtn');
-      if(!owned) b.onclick=()=>{ if(pontos>=a.custo){ addPontos(-a.custo); armasCompradas[a.id]=true; armaEquipada=a.id; if(typeof tocar==='function')tocar('fah'); renderLoja(); renderResumo(); if(typeof renderTudo==='function')renderTudo(); } };
-      else if(!eq) b.onclick=()=>{ armaEquipada=a.id; renderLoja(); renderResumo(); };
+        <div class="s" style="color:#ffd93d">⚡ ${a.especial?a.especial.nome:'—'}</div></div><div class="acoes">${acoes}</div>`;
+      const comprar=div.querySelector('.comprar'), equipar=div.querySelector('.equipar'), evoluir=div.querySelector('.evoluir');
+      if(comprar) comprar.onclick=()=>{ if(pontos>=a.custo){ addPontos(-a.custo); armasCompradas[a.id]=1; armaEquipada=a.id; if(typeof tocar==='function')tocar('fah'); renderLoja(); renderResumo(); if(typeof renderTudo==='function')renderTudo(); if(typeof salvarJogo==='function')salvarJogo(); } };
+      if(equipar) equipar.onclick=()=>{ armaEquipada=a.id; renderLoja(); renderResumo(); };
+      if(evoluir) evoluir.onclick=()=>{ const ev=custoEvo(a); if(pontos>=ev){ addPontos(-ev); armasCompradas[a.id]=nvArma(a.id)+1; if(typeof tocar==='function')tocar('fah'); renderLoja(); renderResumo(); if(typeof renderTudo==='function')renderTudo(); if(typeof salvarJogo==='function')salvarJogo(); } };
       box.appendChild(div);
     });
   }
@@ -1362,6 +1459,7 @@ renderCartas(); renderPets(); renderTudo();
     player={ x:W/2, y:H/2, r:18, hp:curStats.vidaMax, hpMax:curStats.vidaMax };
     enemies=[]; projs=[]; fluts=[]; parts=[]; teclas={}; touchAlvo=null;
     explosoes=[]; raiosVisuais=[]; inimProjs=[]; chuvaResta=0; frenzyT=0; especialCD=3; shakeT=0;
+    reviveRestante = temPet('ex') ? 1 : 0;   // 💔 EX revive 1x
     onda=0; killCount=0; ptsGanhos=0; atkT=0; emBreak=false; graceT=1.5;
     proximaOnda();
     jogando=true; pausado=false; ultimoT=performance.now();
@@ -1396,9 +1494,11 @@ renderCartas(); renderPets(); renderTudo();
   function criarInimigo(tipo){
     let e;
     if(tipo==='boss'){
+      const bt = BOSSES[Math.random()*BOSSES.length|0];
       const vida = 250 + onda*45;
-      e = { emoji:'👹', r:42, boss:true, vidaMax:vida, vida:vida,
-        dano: 13 + onda*0.4, vel: 0.72, xp: 120 + onda*6, pts: 70 + onda*5, especialT: 3 };
+      e = { emoji:bt.emoji, poder:bt.poder, nomeBoss:bt.nome, r:42, boss:true, vidaMax:vida, vida:vida,
+        dano: 13 + onda*0.4, vel: (bt.poder==='puxar'?1.05:0.72), xp: 120 + onda*6, pts: 70 + onda*5, especialT: 3, escudoT: 0 };
+      toast('👹 CHEFÃO: '+bt.nome+' ('+bt.dica+')');
     } else {
       const disp = INIMIGOS.filter(t=>onda>=t.min);
       const b = disp[Math.random()*disp.length|0];
@@ -1426,6 +1526,7 @@ renderCartas(); renderPets(); renderTudo();
     }
   }
   function danoEm(e,dano,lentidao){
+    if(e.boss && e.escudoT>0){ fluts.push({ x:e.x, y:e.y-e.r, txt:'🛡️', cor:'#6ef', vida:0.4, vy:-0.4 }); return; }
     let d=dano, crit=false;
     if(Math.random()<curStats.crit){ d*=2; crit=true; }
     e.vida-=d;
@@ -1441,7 +1542,7 @@ renderCartas(); renderPets(); renderTudo();
   function usarEspecial(){
     if(!jogando || pausado || especialCD>0) return;
     const s=curStats, esp=s.arma.especial; if(!esp) return;
-    especialCD = esp.cd;
+    especialCD = esp.cd * (s.cdMult||1);
     toast('⚡ '+esp.nome);
     if(typeof bip==='function') bip(180,.12,'sawtooth',.2);
     if(esp.tipo==='radial'){
@@ -1478,6 +1579,31 @@ renderCartas(); renderPets(); renderTudo();
       dano:b.dano*(1+(onda-1)*0.10), vel:b.vel*(1+(onda-1)*0.02),
       xp:Math.round(b.xp*(1+(onda-1)*0.08)), pts:Math.round(b.pts*(1+(onda-1)*0.10)),
       x:x+Math.cos(a)*55, y:y+Math.sin(a)*55 });
+  }
+  // poder de cada tipo de chefão (chamado no cooldown do especialT)
+  function bossPoder(e){
+    if(e.poder==='teleporte'){
+      for(let k=0;k<8;k++) parts.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*6, vy:(Math.random()-0.5)*6, vida:0.5, cor:'#c9a0ff' });
+      const a=Math.random()*Math.PI*2, dd=150+Math.random()*130;
+      e.x=Math.max(30,Math.min(W-30, player.x+Math.cos(a)*dd));
+      e.y=Math.max(30,Math.min(H-30, player.y+Math.sin(a)*dd));
+      toast('👻 teleporte!');
+    } else if(e.poder==='escudo'){
+      e.escudoT=2.2; toast('🗿 escudo!');
+    } else if(e.poder==='puxar'){
+      if(modo==='andar'){ const dx=e.x-player.x,dy=e.y-player.y,d=Math.hypot(dx,dy)||1;
+        player.x=Math.max(player.r,Math.min(W-player.r, player.x+dx/d*130));
+        player.y=Math.max(player.r,Math.min(H-player.r, player.y+dy/d*130)); }
+      toast('🧲 puxão!');
+    } else { // atirar / dividir: rajada + invocação
+      bossAtaque(e);
+    }
+  }
+  function criarMiniBoss(pai){
+    const vida=pai.vidaMax*0.5, a=Math.random()*Math.PI*2;
+    enemies.push({ emoji:pai.emoji, poder:'atirar', boss:true, filho:true, r:30, vidaMax:vida, vida:vida,
+      dano:pai.dano*0.7, vel:0.9, xp:Math.round(pai.xp*0.4), pts:Math.round(pai.pts*0.4), especialT:3, escudoT:0,
+      x:pai.x+Math.cos(a)*45, y:pai.y+Math.sin(a)*45 });
   }
 
   function loop(t){
@@ -1522,7 +1648,7 @@ renderCartas(); renderPets(); renderTudo();
 
     for(let i=enemies.length-1;i>=0;i--){ const e=enemies[i];
       if(e.slowT>0) e.slowT-=dt;
-      if(e.boss){ e.especialT-=dt; if(e.especialT<=0){ bossAtaque(e); e.especialT=3.6; } }
+      if(e.boss){ if(e.escudoT>0) e.escudoT-=dt; e.especialT-=dt; if(e.especialT<=0){ bossPoder(e); e.especialT=3.6; } }
       const vef = e.vel * (e.slowT>0 ? (1-e.slowFator) : 1);
       const dx=player.x-e.x,dy=player.y-e.y,d=Math.hypot(dx,dy)||1;
       if(d>player.r+e.r-2){ e.x+=(dx/d)*vef*F; e.y+=(dy/d)*vef*F; }
@@ -1533,7 +1659,10 @@ renderCartas(); renderPets(); renderTudo();
         if(typeof addPontos==='function') addPontos(pts);
         ganharXPheroi(xpg);
         if(s.vampiro) player.hp=Math.min(player.hpMax,player.hp+s.vampiro);
-        if(e.boss){ toast('👹 CHEFÃO DERROTADO!'); tremer(18); }
+        if(e.boss){ tremer(18);
+          if(e.poder==='dividir' && !e.filho){ toast('👾 dividiu!'); criarMiniBoss(e); criarMiniBoss(e); }
+          else toast('👹 CHEFÃO DERROTADO!');
+        }
         for(let k=0;k<(e.boss?18:6);k++) parts.push({ x:e.x, y:e.y, vx:(Math.random()-0.5)*5, vy:(Math.random()-0.5)*5, vida:0.6, cor:e.boss?'#ff5252':(e.emoji==='☀️'?'#ffd93d':'#9db4ff') });
         enemies.splice(i,1);
       }
@@ -1554,7 +1683,10 @@ renderCartas(); renderPets(); renderTudo();
     // onda limpa → escolher upgrade (💎), depois próxima onda
     if(filaSpawn.length===0 && enemies.length===0 && !emBreak){ emBreak=true; abrirUpgrades(); }
 
-    if(player.hp<=0){ fim(); return; }
+    if(player.hp<=0){
+      if(reviveRestante>0){ reviveRestante--; player.hp=player.hpMax*0.5; graceT=1.6; tremer(16); toast('💔 EX te reviveu!'); if(typeof tocar==='function')tocar('fah'); }
+      else { fim(); return; }
+    }
     atualizaHud();
   }
 
@@ -1627,7 +1759,8 @@ renderCartas(); renderPets(); renderTudo();
       ctx.fillStyle='#400'; ctx.fillRect(e.x-w/2,e.y-e.r-8,w,e.boss?6:4);
       ctx.fillStyle=e.boss?'#ff3b3b':'#f66'; ctx.fillRect(e.x-w/2,e.y-e.r-8,w*hpp,e.boss?6:4);
       if(e.slowT>0){ ctx.strokeStyle='#8bd6ff'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(e.x,e.y,e.r+3,0,7); ctx.stroke(); }
-      if(e.boss){ ctx.fillStyle='#ff5252'; ctx.font='bold 13px sans-serif'; ctx.fillText('CHEFÃO',e.x,e.y-e.r-16); }
+      if(e.boss && e.escudoT>0){ ctx.strokeStyle='#6ef'; ctx.lineWidth=4; ctx.globalAlpha=0.7; ctx.beginPath(); ctx.arc(e.x,e.y,e.r+8,0,7); ctx.stroke(); ctx.globalAlpha=1; }
+      if(e.boss){ ctx.fillStyle='#ff5252'; ctx.font='bold 12px sans-serif'; ctx.fillText((e.nomeBoss||'CHEFÃO').toUpperCase(),e.x,e.y-e.r-16); }
     }
     ctx.fillStyle='rgba(110,238,255,0.18)'; ctx.beginPath(); ctx.arc(player.x,player.y,player.r+9,0,7); ctx.fill();
     ctx.font='32px serif'; ctx.fillText('🦸',player.x,player.y);
