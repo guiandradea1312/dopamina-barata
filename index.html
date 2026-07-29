@@ -1919,6 +1919,8 @@ renderCartas(); renderPets(); renderTudo();
   function proximaOnda(){
     onda++;
     if(campanhaAtiva && onda > CAMPANHA[campanhaIdx].alvo){ vencerCampanha(); return; }
+    // 🏆 grava o recorde AO VIVO ao alcançar a onda (vale pra ganhar, perder ou sair no meio)
+    if(onda > recordeOnda){ recordeOnda = onda; if(typeof salvarJogo==='function') salvarJogo(); if(typeof checarConquistas==='function') checarConquistas(); }
     filaSpawn=[];
     if(onda % 5 === 0){                       // 👹 onda de chefão
       filaSpawn.push('boss');
