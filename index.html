@@ -1942,6 +1942,13 @@ renderCartas(); renderPets(); renderTudo();
       const nvA=nvArma(a.id), owned=nvA>0, eq=armaEquipada===a.id;
       const div=document.createElement('div'); div.className='batItem';
       const estrelas = nvA>1 ? ' '+'★'.repeat(Math.min(nvA-1,5)) : '';
+      // dano/cadência efetivos no nível atual (evolução: +30% dano e +6% cadência por nível)
+      const nBase = Math.max(1, nvA);
+      const dmgEff = Math.round(a.dano * (1 + (nBase-1)*0.30) * 10)/10;
+      const cadEff = Math.round(a.cadencia * (1 + (nBase-1)*0.06) * 10)/10;
+      const dmgNext = Math.round(a.dano * (1 + nBase*0.30) * 10)/10;
+      const cadNext = Math.round(a.cadencia * (1 + nBase*0.06) * 10)/10;
+      const previa = owned ? `<div class="s" style="color:#8fdca0">⬆ Nv ${nvA+1}: 💥 ${dmgNext} · 🔫 ${cadNext}/s</div>` : '';
       let acoes;
       if(!owned){
         acoes=`<button class="aBtn comprar" ${pontos<a.custo?'disabled':''}>💰 ${a.custo}</button>`;
@@ -1951,7 +1958,8 @@ renderCartas(); renderPets(); renderTudo();
                <button class="aBtn evoluir" ${pontos<ev?'disabled':''} title="junta uma cópia = evolui">⬆ ${ev}</button>`;
       }
       div.innerHTML=`<div class="ie">${a.emoji}</div><div class="info"><div class="n">${a.nome}<span style="color:#ffd93d">${estrelas}</span>${nvA>1?` <span style="color:#888;font-size:10px">Nv ${nvA}</span>`:''}</div>
-        <div class="s">💥 ${a.dano} · 🔫 ${a.cadencia}/s · 🎯 ${a.alcance}${a.area?' · 💥 área':''}${a.tiros?' · '+a.tiros+' tiros':''}${a.lentidao?' · ❄️':''}</div>
+        <div class="s">💥 ${dmgEff} · 🔫 ${cadEff}/s · 🎯 ${a.alcance}${a.area?' · 💥 área':''}${a.tiros?' · '+a.tiros+' tiros':''}${a.lentidao?' · ❄️':''}</div>
+        ${previa}
         <div class="s" style="color:#ffd93d">⚡ ${a.especial?a.especial.nome:'—'}</div></div><div class="acoes">${acoes}</div>`;
       const comprar=div.querySelector('.comprar'), equipar=div.querySelector('.equipar'), evoluir=div.querySelector('.evoluir');
       if(comprar) comprar.onclick=()=>{ if(pontos>=a.custo){ addPontos(-a.custo); armasCompradas[a.id]=1; armaEquipada=a.id; if(typeof tocar==='function')tocar('fah'); renderLoja(); renderResumo(); if(typeof renderTudo==='function')renderTudo(); if(typeof salvarJogo==='function')salvarJogo(); } };
