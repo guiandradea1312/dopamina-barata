@@ -962,6 +962,7 @@ function recompensaNivel(){
 
 // ================= RENDER BRILHO =================
 function renderBrilho(){
+  if(cortizolLigado()) brilho = cortizolBrilho;   // 🧘 travado: nada altera o brilho
   brilho = Math.max(0, Math.min(100, brilho));
 
   let opEscuro = 0;
@@ -1456,8 +1457,8 @@ function registrarRecorde(chave, valor, silencioso){
 setInterval(()=>{ if(brilho>2 && !cortizolLigado() && !(eventoAtivo&&eventoAtivo.tipo==='brilho')){ brilho-=fatorDecaimento(); renderBrilho(); } },1000);
 
 // ================= 🧘 LOW CORTISOL =================
-let cortizolAtivoAte = 0, cortizolCooldownAte = 0;
-const CORTIZOL_DURACAO = 10*60*1000;   // 10 min de tela estável
+let cortizolAtivoAte = 0, cortizolCooldownAte = 0, cortizolBrilho = 0;
+const CORTIZOL_DURACAO = 5*60*1000;    // 5 min de tela 100% estável
 const CORTIZOL_RECARGA = 30*60*1000;   // recarrega a cada 30 min
 function cortizolLigado(){ return Date.now() < cortizolAtivoAte; }
 function fmtTempo(ms){ ms=Math.max(0,ms); const s=Math.ceil(ms/1000); return String(Math.floor(s/60)).padStart(2,'0')+":"+String(s%60).padStart(2,'0'); }
@@ -1467,8 +1468,9 @@ $("btnCortizol").addEventListener("click", ()=>{
   if(agora < cortizolCooldownAte) return;   // ainda recarregando
   cortizolAtivoAte = agora + CORTIZOL_DURACAO;
   cortizolCooldownAte = agora + CORTIZOL_RECARGA;
+  cortizolBrilho = brilho;   // trava o brilho no valor atual
   bip(320,.2,"sine"); setTimeout(()=>bip(430,.25,"sine"),120);
-  popup(window.innerWidth/2, 220, "🧘 tela estável por 10 min", "#4dd0a7");
+  popup(window.innerWidth/2, 220, "🧘 brilho travado por 5 min", "#4dd0a7");
   atualizaCortizol();
 });
 
