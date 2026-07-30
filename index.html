@@ -860,14 +860,25 @@ function darCarta(raridade){   // 'comum' ou 'rara'
 
 // 🔀 fusão: chave de agrupamento (mesma carta + mesmo nível de fusão)
 function chaveCarta(c){ return c.id + '|' + (c.nivel||1); }
+// descrição gerada a partir dos mods reais (pra carta turbinada mostrar os números certos)
+function descMods(m){
+  const p=[];
+  if(m.clique>0) p.push(`+${Math.round(m.clique)} pts/clique`);
+  if(m.premio!=null && m.premio>1) p.push(m.premio>=2 ? `prêmios ×${(Math.round(m.premio*10)/10)}` : `prêmios +${Math.round((m.premio-1)*100)}%`);
+  if(m.escurec!=null && m.escurec<1) p.push(`escurece ${Math.round((1-m.escurec)*100)}% menos`);
+  if(m.escurec!=null && m.escurec>1) p.push(`<span class="ruim">escurece +${Math.round((m.escurec-1)*100)}%</span>`);
+  if(m.decai!=null && m.decai<1) p.push(`decai ${Math.round((1-m.decai)*100)}% + devagar`);
+  if(m.decai!=null && m.decai>1) p.push(`<span class="ruim">decai +${Math.round((m.decai-1)*100)}% rápido</span>`);
+  return p.join('<br>') || 'turbinada';
+}
 function turbinarCarta(c){
   const m = { ...c.mods };
-  if(m.clique != null) m.clique = m.clique > 0 ? m.clique*2 : 0;      // dobra bônus, remove penalidade
-  if(m.premio != null) m.premio = m.premio >= 1 ? m.premio*1.3 : 1;   // reforça, tira downside
-  if(m.escurec != null) m.escurec = m.escurec > 1 ? m.escurec*0.7 : m.escurec*0.8;
-  if(m.decai != null)   m.decai   = m.decai   > 1 ? m.decai*0.7   : m.decai*0.8;
+  if(m.clique != null) m.clique = m.clique > 0 ? m.clique*3 : 0;          // TRIPLICA bônus, some com a penalidade
+  if(m.premio != null) m.premio = m.premio >= 1 ? m.premio*1.7 : 1.5;     // reforça forte; downside vira BÔNUS
+  if(m.escurec != null) m.escurec = m.escurec > 1 ? m.escurec*0.4 : m.escurec*0.5;   // penalidade vira vantagem
+  if(m.decai != null)   m.decai   = m.decai   > 1 ? m.decai*0.4   : m.decai*0.5;
   const nivel = (c.nivel||1)+1;
-  return { ...c, mods:m, nivel, turbo:true, nome: c.nome.replace(/^★+ /,'') };
+  return { ...c, mods:m, nivel, turbo:true, nome: c.nome.replace(/^★+ /,''), desc: descMods(m) };
 }
 function grupoFundivel(){
   const mapa = {};
@@ -899,7 +910,7 @@ function renderCartas(){
     el.innerHTML =
       `<div class="cEmoji">${c.emoji}${nv>1?`<span class="cNv">★${nv}</span>`:''}</div>
        <div class="cNome">${nv>1?'★ ':''}${c.nome}</div>
-       <div class="cDesc">${c.desc}${nv>1?'<br><span style="color:#ffcf40">★ reforçada</span>':''}</div>
+       <div class="cDesc">${c.turbo?descMods(c.mods):c.desc}${nv>1?'<br><span style="color:#ffcf40">★ reforçada</span>':''}</div>
        <div class="vender">
          <button class="vP">💰${vP}</button>
          <button class="vB">💡${vB}</button>
