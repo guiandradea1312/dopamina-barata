@@ -1847,7 +1847,7 @@ renderCartas(); renderPets(); renderTudo();
   let runBuffs = { ...RUN_ZERO };
   const UPGRADES = [
     { emoji:'💥', nome:'Dano+',     desc:'+25% de dano',        ap:()=>runBuffs.dano+=0.25 },
-    { emoji:'⚡', nome:'Cadência+', desc:'+25% de cadência',    ap:()=>runBuffs.cad+=0.25 },
+    { emoji:'⚡', nome:'Vel. Ataque+', desc:'+25% de velocidade de ataque', ap:()=>runBuffs.cad+=0.25 },
     { emoji:'❤️', nome:'Vida+',     desc:'+40 vida máx (cura)', ap:()=>runBuffs.vidaBonus+=40 },
     { emoji:'✨', nome:'Projétil+', desc:'+1 projétil',         ap:()=>runBuffs.proj+=1 },
     { emoji:'🎯', nome:'Crítico+',  desc:'+8% de crítico',      ap:()=>runBuffs.crit+=0.08 },
