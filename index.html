@@ -18,7 +18,20 @@
     overscroll-behavior: none;
     touch-action: manipulation;
   }
-  body.estourando { background: #ffffff; }
+  body.estourando { background: #ffffff !important; }
+
+  /* ===== 🎨 temas / skins ===== */
+  body[data-tema="neon"]  { background: radial-gradient(circle at 30% 15%, #1a0033, #05000a 70%); }
+  body[data-tema="retro"] { background: radial-gradient(circle at 50% 0%, #012b12, #000a04 70%); }
+  body[data-tema="vapor"] { background: linear-gradient(160deg, #2a0a3a, #0a1636); }
+  body[data-tema="ouro"]  { background: radial-gradient(circle at 50% 10%, #2a2005, #0a0800 70%); }
+  body[data-tema="sangue"]{ background: radial-gradient(circle at 50% 0%, #2a0505, #0a0202 70%); }
+  body[data-tema="neon"]  .abaBtn.ativa { background: #d500f9; color:#fff; }
+  body[data-tema="retro"] .abaBtn.ativa { background: #16a34a; color:#001; }
+  body[data-tema="vapor"] .abaBtn.ativa { background: #ff6ec7; color:#101; }
+  body[data-tema="ouro"]  .abaBtn.ativa { background: #ffcf40; color:#201800; }
+  body[data-tema="sangue"].abaBtn.ativa,
+  body[data-tema="sangue"] .abaBtn.ativa { background: #ff2d2d; color:#fff; }
 
   #mundo { position: relative; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; }
 
@@ -412,6 +425,11 @@
   .statsGrid { display: flex; flex-wrap: wrap; gap: 8px; }
   .statCard { background: #15151d; border: 1px solid #333; border-radius: 10px; padding: 8px; width: calc(50% - 4px); }
   .statCard .sv { font-weight: bold; font-size: 18px; color: #ffe27a; } .statCard .sl { font-size: 11px; color: #9ab; }
+  .temasGrid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .temaBtn { width: calc(33% - 6px); min-width: 92px; background: #15151d; border: 2px solid #333; border-radius: 10px; padding: 8px 4px; cursor: pointer; color: #eee; font-family: inherit; text-align: center; }
+  .temaBtn .te { font-size: 22px; } .temaBtn .tn { font-size: 11px; font-weight: bold; margin-top: 2px; } .temaBtn .td { font-size: 9px; color: #999; }
+  .temaBtn.ativo { border-color: #ffcf40; box-shadow: 0 0 10px #ffcf4055; }
+  .temaBtn.bloq { opacity: .5; cursor: not-allowed; filter: grayscale(.6); }
   #eventoBanner { position: fixed; top: -70px; left: 50%; transform: translateX(-50%); z-index: 1400;
     background: linear-gradient(90deg,#ff5252,#ffd93d,#00e676); color: #111; font-weight: bold; font-size: 16px;
     padding: 10px 22px; border-radius: 0 0 14px 14px; box-shadow: 0 4px 20px #000a; transition: top .4s; white-space: nowrap; max-width: 94vw; text-align: center; }
@@ -601,6 +619,10 @@
       <div class="extraBloco">
         <div class="extraTitulo">🏆 Recordes (seu melhor)</div>
         <div id="extraRecordes" class="statsGrid"></div>
+      </div>
+      <div class="extraBloco">
+        <div class="extraTitulo">🎨 Temas</div>
+        <div id="extraTemas" class="temasGrid"></div>
       </div>
       <div class="extraBloco">
         <div class="extraTitulo">⚙️ Configurações</div>
@@ -1592,6 +1614,8 @@ function renderExtra(){
     return `<div class="conq ${ok?'ok':'bloq'}"><div class="ce">${ok?c.emoji:'🔒'}</div><div style="text-align:left"><div class="cn">${c.nome}</div><div class="cd">${c.desc}</div></div></div>`;
   }).join('');
   renderStats();
+  if(typeof renderTemas==='function') renderTemas();
+  if(typeof renderConfig==='function') renderConfig();
 }
 function renderStats(){
   const box=$("extraStats"); if(!box) return;
@@ -1647,6 +1671,33 @@ $("btnAnuncios").addEventListener("click", ()=>{
   salvar();
 });
 renderConfig();
+// ============ 🎨 TEMAS / SKINS ============
+const TEMAS = [
+  { id:'padrao', emoji:'🌑', nome:'Padrão',   req:'sempre',            cond:()=>true },
+  { id:'neon',   emoji:'💜', nome:'Neon',      req:'nível 10',          cond:()=>nivel>=10 },
+  { id:'retro',  emoji:'💚', nome:'Retrô',     req:'500 cliques',       cond:()=>(contadores.cliques||0)>=500 },
+  { id:'vapor',  emoji:'🌸', nome:'Vaporwave', req:'5 pets',            cond:()=>PETS.filter(p=>temAlgumPet(p.id)).length>=5 },
+  { id:'ouro',   emoji:'⭐', nome:'Dourado',   req:'renascer 1x',       cond:()=>estrelas>=1 },
+  { id:'sangue', emoji:'🩸', nome:'Sangue',    req:'onda 20',           cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=20 },
+];
+function temaLiberado(id){ const t=TEMAS.find(x=>x.id===id); return t ? t.cond() : false; }
+function aplicarTema(){
+  if(!temaLiberado(tema)) tema='padrao';           // se ainda não liberou, volta pro padrão
+  document.body.dataset.tema = tema;
+}
+function renderTemas(){
+  const box=$("extraTemas"); if(!box) return;
+  box.innerHTML='';
+  TEMAS.forEach(t=>{
+    const lib=t.cond(), atual=tema===t.id;
+    const b=document.createElement('button');
+    b.className='temaBtn'+(atual?' ativo':'')+(lib?'':' bloq');
+    b.innerHTML=`<div class="te">${lib?t.emoji:'🔒'}</div><div class="tn">${t.nome}</div><div class="td">${lib?(atual?'em uso':'usar'):t.req}</div>`;
+    if(lib) b.onclick=()=>{ tema=t.id; aplicarTema(); renderTemas(); bip(700,.08,'sine'); salvar(); };
+    box.appendChild(b);
+  });
+}
+aplicarTema();
 // ============ 💾 EXPORTAR / IMPORTAR / RESETAR SAVE ============
 function saveInfo(msg,cor){ const m=$("saveMsg"); if(m){ m.textContent=msg; m.style.color=cor||'#8bc'; } }
 $("btnExportar").addEventListener("click", ()=>{
@@ -2371,7 +2422,6 @@ renderCartas(); renderPets(); renderTudo();
       if(typeof d.anunciosLigados==='boolean') anunciosLigados=d.anunciosLigados;
       if(typeof d.tema==='string') tema=d.tema;
       if(typeof renderConfig==='function') renderConfig();
-      if(typeof aplicarTema==='function') aplicarTema();
       if(d.bat){ const b=d.bat;
         if(b.armasCompradas) armasCompradas=b.armasCompradas;
         if(b.armaEquipada)   armaEquipada=b.armaEquipada;
@@ -2382,6 +2432,7 @@ renderCartas(); renderPets(); renderTudo();
         if(Number.isFinite(b.recordeOnda)) recordeOnda=b.recordeOnda;
         if(Number.isFinite(b.campanhaProg)) campanhaProg=b.campanhaProg;
       }
+      if(typeof aplicarTema==='function') aplicarTema();   // depois de carregar recorde/estrelas/etc
       if(typeof renderTudo==='function') renderTudo();
       if(typeof renderPets==='function') renderPets();
       if(typeof renderCartas==='function') renderCartas();
