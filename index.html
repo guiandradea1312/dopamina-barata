@@ -938,7 +938,7 @@ function addPontos(n){
 
 // ================= NÍVEL / XP =================
 // quanto maior o nível, mais XP precisa (curva ~n^1.7)
-function xpAlvo(n){ return Math.round(10 * Math.pow(n, 1.3)); }
+function xpAlvo(n){ return Math.round(20 * Math.pow(n, 1.7)); }
 function ganharXP(n){
   xp += n;
   let alvo = xpAlvo(nivel);
@@ -1865,7 +1865,7 @@ renderCartas(); renderPets(); renderTudo();
   // 🔫 nível da arma (evolução): true = nível 1 (saves antigos)
   function nvArma(id){ const v=armasCompradas[id]; return v===true?1:(v||0); }
   function habNv(id){ return hab[id]||0; }
-  function xpNec(n){ return Math.round(50*Math.pow(n,1.5)); }
+  function xpNec(n){ return Math.round(20*Math.pow(n,1.3)); }
   function stats(){
     const arma = ARMAS.find(a=>a.id===armaEquipada) || ARMAS[0], pb = petBonus(), r = runBuffs;
     const nvA = Math.max(1, nvArma(armaEquipada)), evo = 1 + (nvA-1)*0.30;
