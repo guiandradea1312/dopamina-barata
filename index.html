@@ -994,12 +994,24 @@ function renderBrilho(){
   if(brilho >= 25) zonaDopa.classList.add("on"); else zonaDopa.classList.remove("on");
 }
 
+// abrevia números grandes: 1.2K, 3.4M, 1.1B...
+function fmt(n){
+  n = Math.round(Number(n)||0);
+  const neg = n<0; n = Math.abs(n);
+  if(n < 1000) return (neg?'-':'') + n;
+  const un = ['K','M','B','T','Qa','Qi','Sx'];
+  let i=-1, v=n;
+  while(v>=1000 && i<un.length-1){ v/=1000; i++; }
+  let num = v>=100 ? Math.round(v) : Math.round(v*10)/10;
+  if(num>=1000 && i<un.length-1){ num = Math.round(num/100)/10; i++; }   // 1000K -> 1M
+  return (neg?'-':'') + num + un[i];
+}
 function renderTudo(){
-  $("vPontos").textContent = pontos;
+  $("vPontos").textContent = fmt(pontos);
   $("vNivel").textContent = nivel;
   const alvoXP = xpAlvo(nivel);
   $("barXP").style.width = Math.min(100, xp/alvoXP*100) + "%";
-  $("xpTxt").textContent = Math.floor(xp) + " / " + alvoXP + " XP";
+  $("xpTxt").textContent = fmt(Math.floor(xp)) + " / " + fmt(alvoXP) + " XP";
   btnComprar.disabled = pontos < CUSTO_BRILHO;
   $("btnSlot").disabled   = pontos < 5  || travado.slot;
   $("btnLoot").disabled   = pontos < 15 || travado.loot;
@@ -1049,7 +1061,7 @@ btnDopa.addEventListener("click", e=>{
 
   bip(300+streak*8,.05,"square");
   const corC = CORES_COMBO[Math.min(CORES_COMBO.length-1, comboMult-1)];
-  numeroFlutua(e.clientX, e.clientY, "+"+ganho, corC, Math.min(28, comboMult*3));
+  numeroFlutua(e.clientX, e.clientY, "+"+fmt(ganho), corC, Math.min(28, comboMult*3));
   chuvaConfete(e.clientX,e.clientY);
   balanca(4 + Math.min(14, comboMult*1.5));           // shake mais forte com combo
   // 🎉 explosão extra a cada 5 no combo
@@ -1114,9 +1126,9 @@ $("btnSlot").addEventListener("click", ()=>{
     if(res[0]===res[1] && res[1]===res[2]){ premio=PAGA3[res[0]]*multPremio(); msg="TRIPLO! 🎉"; tocar('fah'); }
     else if(res[0]===res[1]||res[1]===res[2]||res[0]===res[2]){ premio=5*multPremio(); msg="par!"; }
     if(premio>0){
-      addPontos(premio); popup(window.innerWidth/2,240,"+"+premio+" "+msg,"#7CFC7C");
+      addPontos(premio); popup(window.innerWidth/2,240,"+"+fmt(premio)+" "+msg,"#7CFC7C");
       registrarRecorde('slot', premio);
-      bip(700,.15,"square"); if(premio>=30) festa(msg+" +"+premio);
+      bip(700,.15,"square"); if(premio>=30) festa(msg+" +"+fmt(premio));
     } else { popup(window.innerWidth/2,240,"nada 😐","#888"); bip(150,.15,"sawtooth"); }
     travado.slot=false; renderTudo();
   }, 2100 + 2*100 + 120);
@@ -1145,12 +1157,12 @@ $("btnLoot").addEventListener("click", ()=>{
 // ================= 🎡 ROLETA =================
 // segmentos na ordem do conic-gradient (45° cada)
 const SEG = [
-  {txt:"+40 pontos",    cor:"#00e676", bom:true,  fn:()=>{ const g=Math.round(40*multPremio()); addPontos(g); return "+"+g+" pontos"; }},
+  {txt:"+40 pontos",    cor:"#00e676", bom:true,  fn:()=>{ const g=Math.round(40*multPremio()); addPontos(g); return "+"+fmt(g)+" pontos"; }},
   {txt:"ZEROU NÍVEL 💀", cor:"#ff1744", bom:false, fn:()=>{ nivel=1; xp=0; return "zerou o nível 💀"; }},
   {txt:"+25 brilho",    cor:"#00b0ff", bom:true,  fn:()=>{ const g=Math.round(25*multPremio()); brilho+=g; return "+"+g+" brilho"; }},
   {txt:"+ carta 🃏",     cor:"#d500f9", bom:true,  fn:()=>darCarta('comum')},
   {txt:"PONTOS x2",     cor:"#ffea00", bom:true,  fn:()=>{ pontos*=2; return "PONTOS x2! ✨"; }},
-  {txt:"-40% pontos 💸", cor:"#ff3d00", bom:false, fn:()=>{ const p=Math.round(pontos*0.4); pontos=Math.max(0,pontos-p); return "-"+p+" pontos 💸"; }},
+  {txt:"-40% pontos 💸", cor:"#ff3d00", bom:false, fn:()=>{ const p=Math.round(pontos*0.4); pontos=Math.max(0,pontos-p); return "-"+fmt(p)+" pontos 💸"; }},
   {txt:"-25 brilho",    cor:"#7c4dff", bom:false, fn:()=>{ brilho-=25; return "-25 brilho"; }},
   {txt:"CARTA RARA 🌈",  cor:"#1de9b6", bom:true,  fn:()=>darCarta('rara')},
 ];
@@ -1344,8 +1356,8 @@ function renderPets(){
     }
   });
   const { dp, dx } = rendaPets();
-  let tot = `renda passiva: +${dp} pts a cada 2s`;
-  if(dx>0) tot += `  ·  +${dx} XP/s`;
+  let tot = `renda passiva: +${fmt(dp)} pts a cada 2s`;
+  if(dx>0) tot += `  ·  +${fmt(dx)} XP/s`;
   $("petTotal").textContent = tot;
 }
 
@@ -1416,7 +1428,7 @@ function checarLoginDiario(){
   const bonusBri = 10 + diasSeguidos*2;
   addPontos(bonusPts); brilho += bonusBri;
   $("ldDias").textContent = `🔥 ${diasSeguidos} dia${diasSeguidos>1?'s':''} seguido${diasSeguidos>1?'s':''}`;
-  $("ldPremio").innerHTML = `+${bonusPts} pontos 💰<br>+${bonusBri}% brilho 💡`;
+  $("ldPremio").innerHTML = `+${fmt(bonusPts)} pontos 💰<br>+${bonusBri}% brilho 💡`;
   $("loginDiario").hidden = false;
   if(typeof tocar==='function') tocar('yippee');
   chuvaConfete(window.innerWidth/2, window.innerHeight/2);
@@ -1434,7 +1446,7 @@ function registrarRecorde(chave, valor, silencioso){
   valor = Math.round(valor);
   if(valor > (recordes[chave]||0)){
     recordes[chave] = valor;
-    if(!silencioso){ popup(window.innerWidth/2, 300, "🏆 novo recorde! +"+valor, "#ffcf40"); bip(1000,.1,"square"); }
+    if(!silencioso){ popup(window.innerWidth/2, 300, "🏆 novo recorde! +"+fmt(valor), "#ffcf40"); bip(1000,.1,"square"); }
     return true;
   }
   return false;
@@ -1643,7 +1655,7 @@ function renderStats(){
     ['🏆 Recorde onda', recOnda],
     ['🔥 Dias seguidos', diasSeguidos],
   ];
-  box.innerHTML = stats.map(([l,v])=>`<div class="statCard"><div class="sv">${v}</div><div class="sl">${l}</div></div>`).join('');
+  box.innerHTML = stats.map(([l,v])=>`<div class="statCard"><div class="sv">${typeof v==='number'?fmt(v):v}</div><div class="sl">${l}</div></div>`).join('');
   // 🏆 recordes por minigame
   const recs = [
     ['🖱️ Clique',  recordes.clique||0],
@@ -1652,7 +1664,7 @@ function renderStats(){
     ['🎡 Roleta',  recordes.roleta||0],
   ];
   const rbox = $("extraRecordes");
-  if(rbox) rbox.innerHTML = recs.map(([l,v])=>`<div class="statCard"><div class="sv">${v}</div><div class="sl">maior ${l}</div></div>`).join('');
+  if(rbox) rbox.innerHTML = recs.map(([l,v])=>`<div class="statCard"><div class="sv">${fmt(v)}</div><div class="sl">maior ${l}</div></div>`).join('');
 }
 // ============ 😈 MODO CHATO ============
 function renderModoChato(){ const b=$("btnModoChato"); if(b) b.textContent = modoChato ? '😇 desativar modo chato' : '😈 ativar modo chato'; }
@@ -2010,7 +2022,7 @@ renderCartas(); renderPets(); renderTudo();
     campanhaAtiva=false;
     const ultima = campanhaIdx >= CAMPANHA.length-1;
     $b('batFimTitulo').textContent = '🏆 FASE VENCIDA!';
-    $b('batFimResumo').innerHTML = `<b>${f.nome}</b> concluída!<br>💰 +${f.premio} pontos${f.carta?'<br>🌈 carta rara!':''}${ultima?'<br>👑 você zerou a campanha!':''}`;
+    $b('batFimResumo').innerHTML = `<b>${f.nome}</b> concluída!<br>💰 +${fmt(f.premio)} pontos${f.carta?'<br>🌈 carta rara!':''}${ultima?'<br>👑 você zerou a campanha!':''}`;
     $b('batFim').hidden=false;
   }
 
@@ -2295,9 +2307,9 @@ renderCartas(); renderPets(); renderTudo();
     $b('batHp').style.width=Math.max(0,player.hp/player.hpMax*100)+'%';
     $b('batOnda').textContent=onda;
     $b('batNivel').textContent=heroiNivel;
-    $b('batXp').textContent=Math.floor(heroiXP)+'/'+xpNec(heroiNivel);
+    $b('batXp').textContent=fmt(Math.floor(heroiXP))+'/'+fmt(xpNec(heroiNivel));
     $b('batKills').textContent=killCount;
-    $b('batPts').textContent=ptsGanhos;
+    $b('batPts').textContent=fmt(ptsGanhos);
     const eb=$b('batEspBtn');
     if(especialCD>0){ eb.classList.remove('pronto'); eb.textContent='⚡'+Math.ceil(especialCD); }
     else { eb.classList.add('pronto'); eb.textContent='⚡'; }
@@ -2350,7 +2362,7 @@ renderCartas(); renderPets(); renderTudo();
     const novoRecorde = onda>recordeOnda; if(novoRecorde) recordeOnda=onda;
     let bonusHC = 0;
     if(modoHardcore){ bonusHC = ptsGanhos; if(bonusHC>0 && typeof addPontos==='function') addPontos(bonusHC); }   // 💀 dobra os pontos
-    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${ptsGanhos} pontos${bonusHC>0?` <span style="color:#ff5252">(+${bonusHC} 💀)</span>`:''}<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
+    $b('batFimResumo').innerHTML=`Você chegou na <b>onda ${onda}</b>.<br>💀 ${killCount} inimigos · 💰 +${fmt(ptsGanhos)} pontos${bonusHC>0?` <span style="color:#ff5252">(+${fmt(bonusHC)} 💀)</span>`:''}<br>🎖️ herói nível ${heroiNivel}<br>🏆 recorde: <b>onda ${recordeOnda}</b>${novoRecorde?' 🎉 NOVO!':''}`;
     if(typeof tocar==='function')tocar('boom'); if(typeof salvarJogo==='function')salvarJogo(); if(typeof renderTudo==='function')renderTudo();
   }
   function pararJogo(){ jogando=false; pausado=false; }
