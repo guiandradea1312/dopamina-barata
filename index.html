@@ -1192,17 +1192,13 @@ $("btnOvo").addEventListener("click", ()=>{
   contadores.ovos++; if(typeof progMissao==='function') progMissao('ovos', 1);   // 🎯 missão
   const mp = multPremio();
   const r = Math.random();
-  if(r < 0.35){                       // pontos (35%)
+  if(r < 0.40){                       // pontos (40%)
     const g = Math.round((15+Math.random()*30|0)*mp);
     addPontos(g); bip(500,.1,"sine"); popup(window.innerWidth/2,240,"+"+g+" pts","#ffd93d");
-  } else if(r < 0.57){                // brilho (22%)
+  } else if(r < 0.65){                // brilho (25%)
     const g = Math.round((6+Math.random()*10|0)*mp);
     brilho += g; bip(520,.1,"sine"); popup(window.innerWidth/2,240,"+"+g+"% brilho","#6ec6ff");
-  } else if(r < 0.75){                // carta comum (18%)
-    darCarta('comum');
-  } else if(r < 0.80){                // carta rara (5%)
-    darCarta('rara');
-  } else {                            // PET (20%, sorteado por raridade)
+  } else {                            // PET (35%, sorteado por raridade) — ovo só dá pet, sem carta
     ganharPet();
   }
   renderPets(); renderTudo();
@@ -1472,9 +1468,9 @@ function estrelasSePrestigiar(){ return Math.floor(nivel/5); }
 function prestigiar(){
   if(estrelasSePrestigiar() <= 0) return;
   estrelas += estrelasSePrestigiar();
-  // zera TUDO menos pets e conquistas
+  // zera quase tudo — mantém pets, conquistas e as cartas DOURADAS (turbo)
   pontos=0; nivel=1; xp=0; risco=0; brilho=50;
-  cartas=[];
+  cartas = cartas.filter(c=>c.turbo);
   if(window.resetarBatalha) window.resetarBatalha();
   festa('⭐ RENASCEU! '+estrelas+' estrelas');
   if(typeof tocar==='function') tocar('fah');
@@ -1515,6 +1511,8 @@ const CONQUISTAS = [
   { id:'renascer',emoji:'⭐', nome:'Renascido',       desc:'renasça 1 vez',       cond:()=>estrelas>=1 },
   { id:'onda10',  emoji:'⚔️', nome:'Guerreiro',       desc:'chegue à onda 10',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=10 },
   { id:'onda25',  emoji:'👹', nome:'Caça-chefão',     desc:'chegue à onda 25',    cond:()=>(window.getRecordeOnda?window.getRecordeOnda():0)>=25 },
+  { id:'douradao',emoji:'✨', nome:'Tudo dourado',    desc:'tenha todos os pets dourados', cond:()=>PETS.every(p=>(petsDourados[p.id]||0)>0) },
+  { id:'cartadour',emoji:'🃏', nome:'Carta turbinada', desc:'tenha uma carta dourada ★',   cond:()=>cartas.some(c=>c.turbo) },
 ];
 function checarConquistas(){
   let nova=false;
@@ -1545,7 +1543,7 @@ function renderExtra(){
   const g=estrelasSePrestigiar();
   $("extraPrestigio").innerHTML =
     `⭐ Estrelas: <b>${estrelas}</b> · bônus de pontos: <b>+${Math.round(estrelas*15)}%</b>
-     <div style="font-size:12px;color:#bbb;margin:6px 0">Renascer zera <b>tudo</b> (pontos, nível, brilho, cartas, armas e herói) — só <b>pets</b> e <b>conquistas</b> ficam. Em troca, ganha <b>${g}</b> estrela(s) permanente(s).</div>`;
+     <div style="font-size:12px;color:#bbb;margin:6px 0">Renascer zera pontos, nível, brilho, armas e herói — <b>pets</b>, <b>conquistas</b> e as <b>cartas douradas ★</b> ficam. Em troca, ganha <b>${g}</b> estrela(s) permanente(s).</div>`;
   const btn=$("btnRenascer"); btn.disabled=g<=0; btn.textContent=g>0?`⭐ RENASCER (+${g})`:'⭐ precisa nível 5';
   checarMissoesDia();
   $("extraMissoes").innerHTML = missoes.lista.map(m=>{
