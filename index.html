@@ -341,6 +341,7 @@
   /* ===== efeitos ===== */
   .pop { position: fixed; z-index: 950; font-weight: bold; font-size: 24px; pointer-events: none; animation: subir .9s ease-out forwards; }
   @keyframes subir { 0%{transform:translateY(0) scale(.6);opacity:1} 100%{transform:translateY(-90px) scale(1.4);opacity:0} }
+  .popBig { position: fixed; z-index: 970; font-weight: bold; pointer-events: none; white-space: nowrap; text-shadow: 0 2px 10px rgba(0,0,0,.55); }
   .confete { position: fixed; z-index: 940; width: 10px; height: 14px; pointer-events: none; }
 
   #streak { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
@@ -602,6 +603,15 @@
         <div id="extraRecordes" class="statsGrid"></div>
       </div>
       <div class="extraBloco">
+        <div class="extraTitulo">⚙️ Configurações</div>
+        <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px">
+          <span style="font-size:13px">🔊 Volume</span>
+          <input type="range" id="cfgVolume" min="0" max="100" value="100" style="flex:1;max-width:200px">
+          <span id="cfgVolumeVal" style="font-size:12px;color:#9ab;min-width:34px">100%</span>
+        </div>
+        <button class="btn btn-roxo" id="btnAnuncios" style="max-width:280px">📢 anúncios: LIGADOS</button>
+      </div>
+      <div class="extraBloco">
         <div class="extraTitulo">😈 Modo Chato</div>
         <div style="font-size:12px;color:#bbb;margin-bottom:8px">Pra quem quer sofrer: a tela escurece <b>bem mais rápido</b> e os anúncios aparecem sem parar.</div>
         <button class="btn btn-vermelho2" id="btnModoChato" style="max-width:260px">😈 ativar modo chato</button>
@@ -728,6 +738,9 @@ let pontos = 0, brilho = 50, nivel = 1;
 // Leva 3: prestígio, conquistas, missões, eventos
 let estrelas = 0, conquistas = {}, contadores = { cliques:0, giros:0, ovos:0 }, missoes = null, eventoAtivo = null;
 let modoChato = false;   // Leva 5: UI ainda mais insuportável
+let volumeGeral = 1;     // Leva 7: config de volume (0..1)
+let anunciosLigados = true;   // Leva 7: pode desligar os anúncios falsos
+let tema = 'padrao';     // Leva 8: skin/tema de cor
 // Leva 6: login diário, recordes locais, hardcore
 let ultimoLogin = null, diasSeguidos = 0;
 let recordes = { slot:0, loot:0, roleta:0, clique:0, onda:0 };
@@ -775,11 +788,11 @@ const zonaDopa=$("zonaDopamina"), btnDopa=$("btnDopa"), btnComprar=$("btnComprar
 // ================= SOM =================
 let ac;
 function bip(freq,dur=0.08,tipo="square",vol=0.15){
-  if(!somLigado) return;
+  if(!somLigado || volumeGeral<=0) return;
   try{
     ac = ac || new (window.AudioContext||window.webkitAudioContext)();
     const o=ac.createOscillator(), g=ac.createGain();
-    o.type=tipo; o.frequency.value=freq; g.gain.value=vol;
+    o.type=tipo; o.frequency.value=freq; g.gain.value=vol*volumeGeral;
     o.connect(g); g.connect(ac.destination); o.start();
     g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+dur);
     o.stop(ac.currentTime+dur);
@@ -793,10 +806,10 @@ const SONS = {
   boom:   new Audio("vine-boom.mp3"),            // coisa negativa
 };
 function tocar(nome, vol=0.7){
-  if(!somLigado) return;
+  if(!somLigado || volumeGeral<=0) return;
   const base = SONS[nome]; if(!base) return;
   const a = base.cloneNode();      // clone permite tocar sobreposto / repetido
-  a.volume = vol;
+  a.volume = Math.max(0, Math.min(1, vol*volumeGeral));
   a.play().catch(()=>{});
 }
 
@@ -1002,8 +1015,15 @@ btnDopa.addEventListener("click", e=>{
   contadores.cliques++; progMissao('cliques', 1);   // 🎯 missão
 
   bip(300+streak*8,.05,"square");
-  popup(e.clientX,e.clientY,"+"+ganho,"#ffd93d");
-  chuvaConfete(e.clientX,e.clientY); balanca(); mostraStreak();
+  const corC = CORES_COMBO[Math.min(CORES_COMBO.length-1, comboMult-1)];
+  numeroFlutua(e.clientX, e.clientY, "+"+ganho, corC, Math.min(28, comboMult*3));
+  chuvaConfete(e.clientX,e.clientY);
+  balanca(4 + Math.min(14, comboMult*1.5));           // shake mais forte com combo
+  // 🎉 explosão extra a cada 5 no combo
+  if(streak%5===0){ chuvaConfete(e.clientX,e.clientY); chuvaConfete(e.clientX,e.clientY); balanca(16); bip(880,.09,"square"); }
+  // pulinho no botão
+  try{ e.currentTarget.animate([{transform:'scale(.9)'},{transform:'scale(1.08)'},{transform:'scale(1)'}],{duration:150,easing:'ease-out'}); }catch(_){}
+  mostraStreak();
 
   ganharXP(ganho);   // clicar dá XP; upar fica mais difícil e dá recompensa
 
@@ -1328,8 +1348,22 @@ function chuvaConfete(x,y){
     setTimeout(()=>c.remove(),1300);
   }
 }
-function balanca(){ const m=$("mundo"); m.animate([{transform:"translate(0,0)"},
-  {transform:`translate(${Math.random()*8-4}px,${Math.random()*8-4}px)`},{transform:"translate(0,0)"}],{duration:90}); }
+function balanca(mag=5){ const m=$("mundo"); const d=()=>Math.random()*mag*2-mag;
+  m.animate([{transform:"translate(0,0)"},{transform:`translate(${d()}px,${d()}px)`},
+    {transform:`translate(${d()}px,${d()}px)`},{transform:"translate(0,0)"}],{duration:110,easing:"ease-out"}); }
+// 🔢 número flutuante suculento (sobe, cresce, some) — escala com o combo
+function numeroFlutua(x,y,txt,cor,escala=0){
+  const el=document.createElement("div"); el.className="popBig"; el.textContent=txt;
+  el.style.left=x+"px"; el.style.top=y+"px"; el.style.color=cor;
+  el.style.fontSize=(22+escala)+"px";
+  document.body.appendChild(el);
+  el.animate([{transform:"translate(-50%,-50%) scale(.5)",opacity:0},
+    {transform:"translate(-50%,-115%) scale(1.15)",opacity:1,offset:.28},
+    {transform:"translate(-50%,-260%) scale(1)",opacity:0}],
+    {duration:720,easing:"cubic-bezier(.2,.7,.3,1)"});
+  setTimeout(()=>el.remove(),740);
+}
+const CORES_COMBO=['#ffd93d','#ffcf40','#ff9f43','#ff7043','#ff5252','#ff2d95'];
 function mostraStreak(){ if(streak<3) return; const s=$("streak"); s.textContent=`🔥 ${streak} seguidos!  x${comboMult}`; s.style.opacity=1; }
 function festa(txt){
   const g=$("ganhou"); g.textContent=txt; g.style.display="flex";
@@ -1432,6 +1466,7 @@ const ANUNCIOS = [
   { emoji:'💰', titulo:'DINHEIRO FÁCIL',  texto:'Clique e fique rico em pontos!',     botao:'FICAR RICO',      premio:'pts' },
 ];
 function mostrarAnuncio(){
+  if(!anunciosLigados) return;                                                  // desligado nas config
   if(document.getElementById('batalhaTela').classList.contains('on')) return;   // não durante a batalha
   if(document.querySelectorAll('.anuncio').length >= (modoChato?4:2)) return;    // no máx na tela
   const a = ANUNCIOS[Math.random()*ANUNCIOS.length|0];
@@ -1593,6 +1628,25 @@ $("btnModoChato").addEventListener("click", ()=>{
   salvar();
 });
 renderModoChato();
+// ============ ⚙️ CONFIGURAÇÕES ============
+function renderConfig(){
+  const s=$("cfgVolume"), v=$("cfgVolumeVal"), a=$("btnAnuncios");
+  if(s){ s.value=Math.round(volumeGeral*100); }
+  if(v){ v.textContent=Math.round(volumeGeral*100)+"%"; }
+  if(a){ a.textContent = anunciosLigados ? '📢 anúncios: LIGADOS' : '🔕 anúncios: DESLIGADOS'; }
+}
+$("cfgVolume").addEventListener("input", e=>{
+  volumeGeral = Math.max(0, Math.min(1, (+e.target.value)/100));
+  $("cfgVolumeVal").textContent = Math.round(volumeGeral*100)+"%";
+});
+$("cfgVolume").addEventListener("change", ()=>{ bip(700,.08,"square"); salvar(); });
+$("btnAnuncios").addEventListener("click", ()=>{
+  anunciosLigados=!anunciosLigados; renderConfig();
+  if(!anunciosLigados) document.querySelectorAll('.anuncio').forEach(el=>el.remove());   // limpa os abertos
+  popup(window.innerWidth/2, window.innerHeight/2, anunciosLigados?'📢 anúncios ligados':'🔕 anúncios desligados', '#6ec6ff');
+  salvar();
+});
+renderConfig();
 // ============ 💾 EXPORTAR / IMPORTAR / RESETAR SAVE ============
 function saveInfo(msg,cor){ const m=$("saveMsg"); if(m){ m.textContent=msg; m.style.color=cor||'#8bc'; } }
 $("btnExportar").addEventListener("click", ()=>{
@@ -2287,6 +2341,7 @@ renderCartas(); renderPets(); renderTudo();
         pontos, brilho, nivel, xp, risco, pets, petsDourados, cartas,
         estrelas, conquistas, contadores, missoes, modoChato,
         ultimoLogin, diasSeguidos, recordes, modoHardcore,
+        volumeGeral, anunciosLigados, tema,
         bat: { armasCompradas, armaEquipada, hab, heroiNivel, heroiXP, pontosHab, recordeOnda, campanhaProg }
       }));
     }catch(e){}
@@ -2312,6 +2367,11 @@ renderCartas(); renderPets(); renderTudo();
       if(Number.isFinite(d.diasSeguidos)) diasSeguidos=d.diasSeguidos;
       if(d.recordes && typeof d.recordes==='object') recordes=Object.assign({slot:0,loot:0,roleta:0,clique:0,onda:0}, d.recordes);
       if(typeof d.modoHardcore==='boolean') modoHardcore=d.modoHardcore;
+      if(Number.isFinite(d.volumeGeral)) volumeGeral=Math.max(0,Math.min(1,d.volumeGeral));
+      if(typeof d.anunciosLigados==='boolean') anunciosLigados=d.anunciosLigados;
+      if(typeof d.tema==='string') tema=d.tema;
+      if(typeof renderConfig==='function') renderConfig();
+      if(typeof aplicarTema==='function') aplicarTema();
       if(d.bat){ const b=d.bat;
         if(b.armasCompradas) armasCompradas=b.armasCompradas;
         if(b.armaEquipada)   armaEquipada=b.armaEquipada;
