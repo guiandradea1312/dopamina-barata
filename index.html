@@ -2083,19 +2083,22 @@ renderCartas(); renderPets(); renderTudo();
 
   function criarInimigo(tipo){
     let e;
+    // 📈 dificuldade extra pelo NÍVEL DO HERÓI (quanto mais forte você fica, mais duro fica)
+    const difNv   = 1 + heroiNivel*0.04;   // +4% de vida por nível do herói
+    const difDano = 1 + heroiNivel*0.02;   // +2% de dano por nível do herói
     if(tipo==='boss'){
       const bt = BOSSES[Math.random()*BOSSES.length|0];
-      const vida = 300 + onda*80 + onda*onda*5;    // vida do chefão cresce quadraticamente
+      const vida = (300 + onda*80 + onda*onda*5) * difNv;    // vida do chefão cresce com onda e nível
       e = { emoji:bt.emoji, poder:bt.poder, nomeBoss:bt.nome, r:42, boss:true, vidaMax:vida, vida:vida,
-        dano: 14 + onda*0.9, vel: (bt.poder==='puxar'?1.05:0.72), xp: 140 + onda*8, pts: 80 + onda*7, especialT: 3, escudoT: 0 };
+        dano: (14 + onda*0.9)*difDano, vel: (bt.poder==='puxar'?1.05:0.72), xp: 140 + onda*8, pts: 80 + onda*7, especialT: 3, escudoT: 0 };
       toast('👹 CHEFÃO: '+bt.nome+' ('+bt.dica+')');
     } else {
       const disp = INIMIGOS.filter(t=>onda>=t.min);
       const b = disp[Math.random()*disp.length|0];
-      // escala composta: sobe devagar cedo, dispara no fim (acompanha arma evoluída)
-      const esc = (1 + (onda-1)*0.08) * Math.pow(1.10, onda-1);
+      // escala composta: sobe devagar cedo, dispara no fim (acompanha arma evoluída) × nível do herói
+      const esc = (1 + (onda-1)*0.08) * Math.pow(1.10, onda-1) * difNv;
       e = { emoji:b.emoji, r:b.r, vidaMax:b.vida*esc, vida:b.vida*esc,
-        dano: b.dano*(1+(onda-1)*0.12), vel: b.vel*(1+(onda-1)*0.02),
+        dano: b.dano*(1+(onda-1)*0.12)*difDano, vel: b.vel*(1+(onda-1)*0.02),
         xp: Math.round(b.xp*(1+(onda-1)*0.10)), pts: Math.round(b.pts*(1+(onda-1)*0.12)) };
     }
     // nasce num anel LONGE do herói (fora da tela) — nunca em cima dele
